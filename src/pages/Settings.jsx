@@ -14,7 +14,6 @@ export default function Settings() {
 
     useEffect(() => {
         async function init() {
-            // Get User Info
             const { data: { user } } = await supabase.auth.getUser()
             if (user?.user_metadata) {
                 setProfile({
@@ -23,14 +22,8 @@ export default function Settings() {
                     state: user.user_metadata.state || ''
                 })
             }
-            // Get Catering Items Only
-            const { data } = await supabase.from('services')
-                .select('*')
-                .order('created_at', { ascending: true })
-                
-            // Filter out any old rental junk just in case
-            const cleanList = data?.filter(i => i.item_type !== 'rental') || []
-            setItems(cleanList)
+            const { data } = await supabase.from('services').select('*').order('created_at', { ascending: true })
+            setItems(data?.filter(i => i.item_type !== 'rental') || [])
             setLoading(false)
         }
         init()
@@ -38,9 +31,7 @@ export default function Settings() {
 
     async function saveProfile() {
         setSavingProfile(true)
-        const { error } = await supabase.auth.updateUser({
-            data: { business_name: profile.business_name, city: profile.city, state: profile.state }
-        })
+        const { error } = await supabase.auth.updateUser({ data: { business_name: profile.business_name, city: profile.city, state: profile.state } })
         setSavingProfile(false)
         if (error) alert("Error saving profile")
         else alert("Profile updated!")
@@ -49,21 +40,13 @@ export default function Settings() {
     async function handleSaveItem() {
         if (!newItem.name) return alert("Item Name required")
         const { data: { user } } = await supabase.auth.getUser()
-        
-        const payload = {
-            name: newItem.name,
-            description: newItem.description,
-            category: newItem.category,
-            item_type: 'catering', // Hardcode this now
-            user_id: user.id
-        }
+        const payload = { name: newItem.name, description: newItem.description, category: newItem.category, item_type: 'catering', user_id: user.id }
 
         if (editingId) {
             await supabase.from('services').update(payload).eq('id', editingId)
         } else {
             await supabase.from('services').insert(payload)
         }
-        
         resetForm()
         const { data } = await supabase.from('services').select('*').order('created_at', { ascending: true })
         setItems(data?.filter(i => i.item_type !== 'rental') || [])
@@ -76,11 +59,7 @@ export default function Settings() {
 
     function startEditing(item) {
         setEditingId(item.id)
-        setNewItem({ 
-            name: item.name, 
-            category: item.category || 'Entree', 
-            description: item.description || ''
-        })
+        setNewItem({ name: item.name, category: item.category || 'Entree', description: item.description || '' })
     }
 
     async function deleteItem(id) {
@@ -95,10 +74,8 @@ export default function Settings() {
         return <Beef size={16} color="#e11d48"/>
     }
 
-    const inputStyle = { padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', width: '100%', boxSizing: 'border-box' }
-
     return (
-        <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', fontFamily: 'sans-serif' }}>
+        <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', fontFamily: 'sans-serif', paddingBottom:'80px' }}>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px' }}>
                 <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}><ArrowLeft size={24} /></button>
@@ -110,22 +87,22 @@ export default function Settings() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                     <h3 style={{ margin: '0 0 5px 0', display: 'flex', alignItems: 'center', gap: '10px' }}><Building size={20} color="#3b82f6" /> Business Profile</h3>
                     <button onClick={saveProfile} disabled={savingProfile} style={{ background: '#0f172a', color: 'white', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Save size={16} /> {savingProfile ? 'Saving...' : 'Save Profile'}
+                        <Save size={16} /> {savingProfile ? 'Saving...' : 'Save'}
                     </button>
                 </div>
-                <div style={{ display: 'grid', gap: '15px' }}>
+                <div className="profile-grid">
                     <div>
                         <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#475569', marginBottom: '5px' }}>Business Name</label>
-                        <input value={profile.business_name} onChange={e => setProfile({...profile, business_name: e.target.value})} placeholder="e.g. Apex Catering" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
+                        <input value={profile.business_name} onChange={e => setProfile({...profile, business_name: e.target.value})} placeholder="e.g. Apex Catering" className="std-input" />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                    <div className="city-state-grid">
                         <div>
                             <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#475569', marginBottom: '5px' }}>City</label>
-                            <input value={profile.city} onChange={e => setProfile({...profile, city: e.target.value})} placeholder="e.g. Miami" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
+                            <input value={profile.city} onChange={e => setProfile({...profile, city: e.target.value})} placeholder="e.g. Miami" className="std-input" />
                         </div>
                         <div>
                             <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#475569', marginBottom: '5px' }}>State</label>
-                            <input value={profile.state} onChange={e => setProfile({...profile, state: e.target.value})} placeholder="e.g. FL" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
+                            <input value={profile.state} onChange={e => setProfile({...profile, state: e.target.value})} placeholder="e.g. FL" className="std-input" />
                         </div>
                     </div>
                 </div>
@@ -135,27 +112,19 @@ export default function Settings() {
             <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '25px' }}>
                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
                     <h3 style={{ margin: 0, display:'flex', alignItems:'center', gap:'10px' }}><Utensils size={20} color="#f59e0b"/> Menu Items</h3>
-                    {editingId && (
-                        <button onClick={resetForm} style={{background:'#fee2e2', color:'#dc2626', border:'none', padding:'6px 12px', borderRadius:'6px', cursor:'pointer', fontWeight:'bold', fontSize:'12px', display:'flex', gap:'5px', alignItems:'center'}}>
-                            <X size={14}/> Cancel Edit
-                        </button>
-                    )}
+                    {editingId && <button onClick={resetForm} style={{background:'#fee2e2', color:'#dc2626', border:'none', padding:'6px 12px', borderRadius:'6px', cursor:'pointer', fontWeight:'bold', fontSize:'12px', display:'flex', gap:'5px', alignItems:'center'}}><X size={14}/> Cancel</button>}
                 </div>
 
-                <div style={{ 
-                    display: 'grid', gridTemplateColumns: '1fr 2fr 2fr auto', gap: '10px', alignItems: 'center', 
-                    background: editingId ? '#fff7ed' : '#f8fafc', padding: '15px', borderRadius: '12px', marginBottom: '20px', 
-                    border: editingId ? '1px solid #fdba74' : '1px dashed #cbd5e1'
-                }}>
-                    <select value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} style={inputStyle}>
+                <div className={`input-grid ${editingId ? 'editing' : ''}`}>
+                    <select value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} className="std-input">
                         <option value="Entree">Entree</option>
                         <option value="Side">Side</option>
                         <option value="Drink">Drink</option>
                     </select>
-                    <input placeholder="Item Name (e.g. Birria)" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} style={inputStyle} />
-                    <input placeholder="Description (Optional)" value={newItem.description} onChange={e => setNewItem({...newItem, description: e.target.value})} style={inputStyle} />
+                    <input placeholder="Item Name" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="std-input" />
+                    <input placeholder="Description" value={newItem.description} onChange={e => setNewItem({...newItem, description: e.target.value})} className="std-input" />
                     
-                    <button onClick={handleSaveItem} style={{ background: editingId ? '#ea580c' : '#2563EB', color: 'white', border: 'none', width: '40px', height: '40px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <button onClick={handleSaveItem} style={{ background: editingId ? '#ea580c' : '#2563EB', color: 'white', border: 'none', height: '42px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
                         {editingId ? <Check size={20} /> : <Plus size={20} />}
                     </button>
                 </div>
@@ -167,9 +136,7 @@ export default function Settings() {
                                 <div style={{background:'#f8fafc', padding:'8px', borderRadius:'8px'}}>{getIcon(s.category)}</div>
                                 <div>
                                     <div style={{ fontWeight: 'bold', color: '#334155' }}>{s.name}</div>
-                                    <div style={{ fontSize: '12px', color: '#64748b' }}>
-                                        <span style={{fontWeight:'bold', color: '#94a3b8', textTransform:'uppercase'}}>{s.category}</span> {s.description && ` • ${s.description}`}
-                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#64748b' }}>{s.category}</div>
                                 </div>
                             </div>
                             <div style={{display:'flex', gap:'5px'}}>
@@ -178,9 +145,21 @@ export default function Settings() {
                             </div>
                         </div>
                     ))}
-                    {items.length === 0 && <div style={{padding:'20px', textAlign:'center', color:'#cbd5e1'}}>No menu items added yet.</div>}
                 </div>
             </div>
+
+            <style>{`
+                .std-input { padding: 10px; borderRadius: 6px; border: 1px solid #cbd5e1; width: 100%; box-sizing: border-box; }
+                .profile-grid { display: grid; gap: 15px; }
+                .city-state-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+                .input-grid { display: grid; grid-template-columns: 1fr 2fr 2fr 60px; gap: 10px; align-items: center; background: #f8fafc; padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px dashed #cbd5e1; }
+                .input-grid.editing { background: #fff7ed; border: 1px solid #fdba74; }
+
+                @media (max-width: 768px) {
+                    .input-grid { grid-template-columns: 1fr; gap: 15px; }
+                    .city-state-grid { grid-template-columns: 1fr; }
+                }
+            `}</style>
         </div>
     )
 }
