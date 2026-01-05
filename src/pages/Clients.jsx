@@ -30,10 +30,14 @@ export default function Clients() {
     async function createClient() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return alert("Please log in.")
+        
         const newClient = { full_name: 'New Client', email: '', phone: '', address: '', job_price: 0, status: 'lead', service_data: {}, user_id: user.id }
+        
         const { data, error } = await supabase.from('customers').insert(newClient).select().single()
-        if (error) alert(error.message)
-        else {
+        
+        if (error) {
+            alert("Error creating: " + error.message) // Show actual error
+        } else {
             setClients([data, ...clients])
             handleSelectClient(data)
         }
@@ -47,9 +51,26 @@ export default function Clients() {
     async function saveToDatabase() {
         if (!selectedClient) return
         setSaving(true)
-        const { error } = await supabase.from('customers').update(selectedClient).eq('id', selectedClient.id)
+        
+        // We strip out fields that shouldn't be updated manually just in case
+        const { error } = await supabase.from('customers')
+            .update({
+                full_name: selectedClient.full_name,
+                email: selectedClient.email,
+                phone: selectedClient.phone,
+                address: selectedClient.address,
+                service_data: selectedClient.service_data,
+                job_price: selectedClient.job_price,
+                status: selectedClient.status
+            })
+            .eq('id', selectedClient.id)
+            
         setSaving(false)
-        if (error) alert('Error saving')
+        if (error) {
+            alert("Save Failed: " + error.message) // This will tell us the exact reason
+        } else {
+            // Optional: alert("Saved successfully!") 
+        }
     }
 
     async function deleteClient() {
@@ -59,6 +80,8 @@ export default function Clients() {
             setClients(clients.filter(c => c.id !== selectedClient.id))
             setSelectedClient(null)
             setSearchParams({})
+        } else {
+            alert("Delete failed: " + error.message)
         }
     }
 
@@ -67,7 +90,6 @@ export default function Clients() {
         setSearchParams({ id: client.id })
     }
 
-    // Mobile "Back" function
     function goBack() {
         setSelectedClient(null)
         setSearchParams({})
@@ -159,14 +181,15 @@ export default function Clients() {
                 .spin { animation: spin 1s linear infinite; }
                 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-                @media (max-width: 768px) {
+                /* ONLY HIDE SIDEBAR ON VERY SMALL SCREENS (Phones) */
+                @media (max-width: 600px) {
                     .sidebar { width: 100%; border-right: none; }
                     .main-content { width: 100%; }
                     
-                    /* HIDE SIDEBAR IF CLIENT SELECTED */
+                    /* Hide Sidebar when viewing a client */
                     .hidden-mobile { display: none !important; }
                     
-                    /* SHOW BACK BUTTON ON MOBILE */
+                    /* Show Back Button */
                     .mobile-only { display: flex !important; }
                 }
             `}</style>
