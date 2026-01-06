@@ -57,7 +57,7 @@ export default function Sidebar({ isOpen, onClose, onLogout }) {
                             fontSize: '10px', fontWeight: 'bold', color: '#94a3b8', 
                             letterSpacing: '2px', marginTop: '6px', textTransform: 'uppercase' 
                         }}>
-                            FLOW OS
+                            CATERFLOW OS
                         </div>
                     </div>
                     <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 0 }}>

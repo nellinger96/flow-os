@@ -84,7 +84,7 @@ export default function Login() {
                             <LayoutGrid size={24} />
                         </div>
                         <div>
-                            <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.5px' }}>FLOW OS</h2>
+                            <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.5px' }}>CATERFLOW OS</h2>
                             <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600', letterSpacing: '1px', textTransform: 'uppercase' }}>Catering Edition</span>
                         </div>
                     </div>
@@ -225,7 +225,7 @@ export default function Login() {
                         {mode === 'login' ? '"Simplicity is the ultimate sophistication."' : mode === 'signup' ? '"The secret of getting ahead is getting started."' : '"Recovery is part of the process."'}
                     </div>
                     <div style={{ fontSize: '18px', opacity: 0.8, lineHeight: '1.6', fontWeight: '300' }}>
-                        Manage your menus, track your events, and streamline your kitchen operations with Flow OS.
+                        Manage your menus, track your events, and streamline your kitchen operations with CaterFlow OS.
                     </div>
                 </div>
             </div>
