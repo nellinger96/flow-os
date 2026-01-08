@@ -34,8 +34,6 @@ export default function SignContract() {
         if (clientData.user_id) {
             // Note: In a real multi-tenant app, you'd fetch the user's profile metadata differently. 
             // For now, we assume the logged-in structure or just generic.
-            // If you want to show YOUR business name here dynamically, you'd need a public profile table.
-            // For this prototype, we'll default or try to read if available.
         }
         
         setLoading(false)
@@ -77,7 +75,11 @@ export default function SignContract() {
     if (error) return <div style={{padding:'40px', textAlign:'center', color:'#ef4444', fontWeight:'bold'}}>{error}</div>
 
     // Helpers
-    const eventDate = client.service_data?.event_date ? new Date(client.service_data.event_date).toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' }) : 'Date TBD'
+    // --- GEMINI FIX: Added timeZone: 'UTC' to prevent the date from shifting back a day ---
+    const eventDate = client.service_data?.event_date 
+        ? new Date(client.service_data.event_date).toLocaleDateString('en-US', { timeZone: 'UTC', weekday:'long', year:'numeric', month:'long', day:'numeric' }) 
+        : 'Date TBD'
+        
     const paymentPlan = client.service_data?.payment_plan || []
     const menuItems = client.service_data?.selected_menu_items || []
 
