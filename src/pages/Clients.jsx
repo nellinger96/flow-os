@@ -14,12 +14,28 @@ export default function Clients() {
 
     useEffect(() => { fetchClients() }, [])
 
+    // --- UPDATED: SECURE FETCHING ---
     async function fetchClients() {
-        const { data } = await supabase.from('customers').select('*').order('created_at', { ascending: false })
+        // 1. Get the current logged-in user
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!user) {
+            setLoading(false)
+            return // Stop if not logged in
+        }
+
+        // 2. Fetch ONLY customers that match this user's ID
+        const { data } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('user_id', user.id) // <--- THIS IS THE PRIVACY FILTER
+            .order('created_at', { ascending: false })
+
         if (data) {
             setClients(data)
             const paramId = searchParams.get('id')
             if (paramId) {
+                // We still search within 'data' because 'data' is now only MY clients
                 const target = data.find(c => c.id.toString() === paramId)
                 if (target) setSelectedClient(target)
             }
@@ -31,12 +47,13 @@ export default function Clients() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return alert("Please log in.")
         
+        // We tag the new client with the user's ID automatically
         const newClient = { full_name: 'New Client', email: '', phone: '', address: '', job_price: 0, status: 'lead', service_data: {}, user_id: user.id }
         
         const { data, error } = await supabase.from('customers').insert(newClient).select().single()
         
         if (error) {
-            alert("Error creating: " + error.message) // Show actual error
+            alert("Error creating: " + error.message)
         } else {
             setClients([data, ...clients])
             handleSelectClient(data)
@@ -52,7 +69,6 @@ export default function Clients() {
         if (!selectedClient) return
         setSaving(true)
         
-        // We strip out fields that shouldn't be updated manually just in case
         const { error } = await supabase.from('customers')
             .update({
                 full_name: selectedClient.full_name,
@@ -67,9 +83,7 @@ export default function Clients() {
             
         setSaving(false)
         if (error) {
-            alert("Save Failed: " + error.message) // This will tell us the exact reason
-        } else {
-            // Optional: alert("Saved successfully!") 
+            alert("Save Failed: " + error.message)
         }
     }
 
