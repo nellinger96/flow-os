@@ -12,6 +12,17 @@ export default function CateringView({ formData, setFormData, clientId }) {
     
     const [businessProfile, setBusinessProfile] = useState(null)
 
+    // --- FIX: LOCAL BUFFERS (Prevents the "Reverting Number" Bug) ---
+    // These hold the value temporarily while you type
+    const [localPrice, setLocalPrice] = useState(formData.service_data?.price_per_head || '')
+    const [localGuests, setLocalGuests] = useState(formData.service_data?.guest_count || '')
+
+    // Sync the buffers if you switch to a different client
+    useEffect(() => {
+        setLocalPrice(formData.service_data?.price_per_head || '')
+        setLocalGuests(formData.service_data?.guest_count || '')
+    }, [formData.service_data?.price_per_head, formData.service_data?.guest_count])
+
     // --- 1. FETCH & FILTER DATA ---
     useEffect(() => {
         const fetchData = async () => {
@@ -303,19 +314,59 @@ export default function CateringView({ formData, setFormData, clientId }) {
                 </div>
             </div>
 
-            {/* CALCULATOR */}
+            {/* CALCULATOR (FIXED WITH LOCAL BUFFERS) */}
             <div style={sectionStyle}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                     <div><label style={labelStyle}>Event Date</label><input type="date" value={formData.service_data?.event_date || ''} onChange={e => updateService('event_date', e.target.value)} style={inputStyle} /></div>
                     <div><label style={labelStyle}>Service Time</label><input type="time" value={formData.service_data?.event_time || ''} onChange={e => updateService('event_time', e.target.value)} style={inputStyle} /></div>
-                    <div><label style={labelStyle}>Guest Count</label><input type="number" placeholder="0" value={formData.service_data?.guest_count || ''} onChange={e => updateService('guest_count', e.target.value)} style={{...inputStyle, fontWeight:'bold', color:'#2563EB'}} /></div>
+                    
+                    {/* FIXED: GUEST COUNT INPUT */}
+                    <div>
+                        <label style={labelStyle}>Guest Count</label>
+                        <input 
+                            type="number" 
+                            placeholder="0" 
+                            value={localGuests} // Use Local Buffer
+                            onChange={e => setLocalGuests(e.target.value)} // Update Buffer immediately
+                            onBlur={e => updateService('guest_count', e.target.value)} // Save & Calc on click away
+                            style={{...inputStyle, fontWeight:'bold', color:'#2563EB'}} 
+                        />
+                    </div>
                 </div>
+
                 <div style={{ background:'#eff6ff', padding:'15px', borderRadius:'8px', border:'1px solid #bfdbfe', display:'flex', gap:'15px', alignItems:'flex-end' }}>
-                    <div style={{flex:1}}><label style={{...labelStyle, color:'#1e40af'}}>Price Per Person ($)</label><div style={{position:'relative'}}><DollarSign size={14} style={{position:'absolute', left:'10px', top:'10px', color:'#93c5fd'}}/><input type="number" placeholder="0.00" value={formData.service_data?.price_per_head || ''} onChange={e => updateService('price_per_head', e.target.value)} style={{...inputStyle, paddingLeft:'25px', borderColor:'#bfdbfe'}} /></div></div>
+                    
+                    {/* FIXED: PRICE PER PERSON INPUT */}
+                    <div style={{flex:1}}>
+                        <label style={{...labelStyle, color:'#1e40af'}}>Price Per Person ($)</label>
+                        <div style={{position:'relative'}}>
+                            <DollarSign size={14} style={{position:'absolute', left:'10px', top:'10px', color:'#93c5fd'}}/>
+                            <input 
+                                type="number" 
+                                placeholder="0.00" 
+                                value={localPrice} // Use Local Buffer
+                                onChange={e => setLocalPrice(e.target.value)} // Update Buffer immediately
+                                onBlur={e => updateService('price_per_head', e.target.value)} // Save & Calc on click away
+                                style={{...inputStyle, paddingLeft:'25px', borderColor:'#bfdbfe'}} 
+                            />
+                        </div>
+                    </div>
+
                     <div style={{paddingBottom:'10px', color:'#93c5fd'}}><X size={16} /></div>
-                    <div style={{flex:1}}><label style={{...labelStyle, color:'#1e40af'}}>Guest Count</label><input disabled type="number" value={formData.service_data?.guest_count || 0} style={{...inputStyle, background:'#e0f2fe', borderColor:'#bfdbfe', color:'#64748b'}} /></div>
+                    
+                    <div style={{flex:1}}>
+                        <label style={{...labelStyle, color:'#1e40af'}}>Guest Count</label>
+                        <input disabled type="number" value={localGuests || 0} style={{...inputStyle, background:'#e0f2fe', borderColor:'#bfdbfe', color:'#64748b'}} />
+                    </div>
+                    
                     <div style={{paddingBottom:'10px', color:'#93c5fd'}}>=</div>
-                    <div style={{flex:1}}><label style={{...labelStyle, color:'#1e40af'}}>Calculated Total</label><div style={{ background:'white', border:'1px solid #2563EB', borderRadius:'6px', padding:'10px', fontWeight:'bold', color:'#2563EB' }}>${parseFloat(formData.job_price || 0).toLocaleString()}</div></div>
+                    
+                    <div style={{flex:1}}>
+                        <label style={{...labelStyle, color:'#1e40af'}}>Calculated Total</label>
+                        <div style={{ background:'white', border:'1px solid #2563EB', borderRadius:'6px', padding:'10px', fontWeight:'bold', color:'#2563EB' }}>
+                            ${parseFloat(formData.job_price || 0).toLocaleString()}
+                        </div>
+                    </div>
                 </div>
             </div>
 
