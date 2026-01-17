@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
-import { CheckCircle, PenTool, Calendar, MapPin, Clock, Users, FileText, ChevronRight, CreditCard, ShieldAlert } from 'lucide-react'
+import { CheckCircle, PenTool, Calendar, MapPin, Clock, Users, FileText, ChevronRight, CreditCard, ShieldAlert, Utensils } from 'lucide-react'
 import confetti from 'canvas-confetti' 
 
 export default function SignContract() {
@@ -11,7 +11,7 @@ export default function SignContract() {
     const [signature, setSignature] = useState('')
     const [signed, setSigned] = useState(false)
     const [error, setError] = useState(null)
-    const [agreedToTerms, setAgreedToTerms] = useState(false) // New State for Checkbox
+    const [agreedToTerms, setAgreedToTerms] = useState(false)
 
     useEffect(() => {
         fetchContract()
@@ -25,6 +25,9 @@ export default function SignContract() {
             setLoading(false)
             return
         }
+        
+        // DEBUG: Uncomment this line if items still don't show to see exact data structure in Console
+        // console.log("Service Data from DB:", clientData.service_data)
         
         setClient(clientData)
         if (clientData.contract_url === 'SIGNED_DIGITALLY') setSigned(true)
@@ -62,13 +65,22 @@ export default function SignContract() {
     if (loading) return <div style={{height:'100vh', display:'flex', alignItems:'center', justifyContent:'center', color:'#64748b'}}>Loading Proposal...</div>
     if (error) return <div style={{padding:'40px', textAlign:'center', color:'#ef4444', fontWeight:'bold'}}>{error}</div>
 
-    // Helpers
+    // --- DATA EXTRACTION HELPERS ---
     const eventDate = client.service_data?.event_date 
         ? new Date(client.service_data.event_date).toLocaleDateString('en-US', { timeZone: 'UTC', weekday:'long', year:'numeric', month:'long', day:'numeric' }) 
         : 'Date TBD'
         
     const paymentPlan = client.service_data?.payment_plan || []
-    const menuItems = client.service_data?.selected_menu_items || []
+
+    // ROBUST MENU CHECKER: Checks multiple possible locations for menu data
+    const entrees = client.service_data?.entrees || client.service_data?.menu?.entrees || []
+    const sides = client.service_data?.sides || client.service_data?.menu?.sides || []
+    const drinks = client.service_data?.drinks || client.service_data?.menu?.drinks || []
+    
+    // Fallback if data is stored as a simple list
+    const legacyMenu = client.service_data?.selected_menu_items || []
+    
+    const hasMenu = entrees.length > 0 || sides.length > 0 || drinks.length > 0 || legacyMenu.length > 0
 
     // --- ALREADY SIGNED VIEW ---
     if (signed) {
@@ -136,17 +148,49 @@ export default function SignContract() {
                     {/* MENU & SERVICES */}
                     <div style={{ marginBottom: '40px' }}>
                         <h3 style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <FileText size={20} /> Service Details
+                            <Utensils size={20} /> Service Details
                         </h3>
                         
-                        {/* Selected Packages */}
-                        {menuItems.length > 0 ? (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px', marginTop: '15px' }}>
-                                {menuItems.map(item => (
-                                    <span key={item} style={{ background: '#eff6ff', color: '#1e40af', padding: '6px 12px', borderRadius: '20px', fontSize: '14px', fontWeight: '500', border:'1px solid #bfdbfe' }}>
-                                        {item}
-                                    </span>
-                                ))}
+                        {/* Dynamic Menu Display */}
+                        {hasMenu ? (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginTop: '20px' }}>
+                                
+                                {entrees.length > 0 && (
+                                    <div>
+                                        <div style={{fontSize:'12px', fontWeight:'bold', color:'#94a3b8', textTransform:'uppercase', marginBottom:'8px'}}>Entrees</div>
+                                        {entrees.map((item, i) => (
+                                            <div key={i} style={{marginBottom:'5px', fontWeight:'500', color:'#334155'}}>• {item}</div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {sides.length > 0 && (
+                                    <div>
+                                        <div style={{fontSize:'12px', fontWeight:'bold', color:'#94a3b8', textTransform:'uppercase', marginBottom:'8px'}}>Sides</div>
+                                        {sides.map((item, i) => (
+                                            <div key={i} style={{marginBottom:'5px', fontWeight:'500', color:'#334155'}}>• {item}</div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {drinks.length > 0 && (
+                                    <div>
+                                        <div style={{fontSize:'12px', fontWeight:'bold', color:'#94a3b8', textTransform:'uppercase', marginBottom:'8px'}}>Drinks</div>
+                                        {drinks.map((item, i) => (
+                                            <div key={i} style={{marginBottom:'5px', fontWeight:'500', color:'#334155'}}>• {item}</div>
+                                        ))}
+                                    </div>
+                                )}
+                                
+                                {legacyMenu.length > 0 && (
+                                    <div>
+                                        <div style={{fontSize:'12px', fontWeight:'bold', color:'#94a3b8', textTransform:'uppercase', marginBottom:'8px'}}>Included Items</div>
+                                        {legacyMenu.map((item, i) => (
+                                            <div key={i} style={{marginBottom:'5px', fontWeight:'500', color:'#334155'}}>• {item}</div>
+                                        ))}
+                                    </div>
+                                )}
+
                             </div>
                         ) : (
                             <div style={{ margin: '15px 0', fontSize: '14px', color: '#94a3b8', fontStyle: 'italic' }}>
@@ -154,7 +198,7 @@ export default function SignContract() {
                             </div>
                         )}
 
-                        <p style={{ lineHeight: '1.6', color: '#475569', background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                        <p style={{ marginTop: '25px', lineHeight: '1.6', color: '#475569', background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                             <strong>Notes: </strong>
                             {client.job_notes || 'Standard services as discussed.'}
                         </p>
@@ -189,7 +233,7 @@ export default function SignContract() {
                         </div>
                     )}
 
-                    {/* NEW: TERMS & CONDITIONS BOX */}
+                    {/* TERMS & CONDITIONS BOX */}
                     <div style={{ marginBottom: '30px' }}>
                         <h3 style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <ShieldAlert size={20} /> Terms & Conditions
