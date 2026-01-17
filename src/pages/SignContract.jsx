@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
-import { CheckCircle, PenTool, Calendar, MapPin, Clock, Users, DollarSign, FileText, ChevronRight, CreditCard } from 'lucide-react'
-import confetti from 'canvas-confetti' // We'll simulate this effect with basic CSS if package missing, or just logic
+import { CheckCircle, PenTool, Calendar, MapPin, Clock, Users, FileText, ChevronRight, CreditCard, ShieldAlert } from 'lucide-react'
+import confetti from 'canvas-confetti' 
 
 export default function SignContract() {
     const { id } = useParams()
@@ -11,14 +11,13 @@ export default function SignContract() {
     const [signature, setSignature] = useState('')
     const [signed, setSigned] = useState(false)
     const [error, setError] = useState(null)
-    const [businessName, setBusinessName] = useState('Service Provider')
+    const [agreedToTerms, setAgreedToTerms] = useState(false) // New State for Checkbox
 
     useEffect(() => {
         fetchContract()
     }, [])
 
     async function fetchContract() {
-        // Fetch Client
         const { data: clientData, error } = await supabase.from('customers').select('*').eq('id', id).single()
         
         if (error) {
@@ -29,17 +28,11 @@ export default function SignContract() {
         
         setClient(clientData)
         if (clientData.contract_url === 'SIGNED_DIGITALLY') setSigned(true)
-
-        // Fetch Business Name (Owner)
-        if (clientData.user_id) {
-            // Note: In a real multi-tenant app, you'd fetch the user's profile metadata differently. 
-            // For now, we assume the logged-in structure or just generic.
-        }
-        
         setLoading(false)
     }
 
     async function handleSign() {
+        if (!agreedToTerms) return alert("Please read and accept the Terms & Conditions.")
         if (!signature || signature.length < 3) return alert("Please type your full legal name to sign.")
         
         const timestamp = new Date().toISOString()
@@ -47,12 +40,13 @@ export default function SignContract() {
         const { error } = await supabase
             .from('customers')
             .update({
-                status: 'sold', // Auto-move pipeline to Booked
+                status: 'sold', 
                 contract_url: 'SIGNED_DIGITALLY',
                 service_data: { 
                     ...client.service_data, 
                     signed_by: signature, 
-                    signed_at: timestamp 
+                    signed_at: timestamp,
+                    terms_accepted: true
                 }
             })
             .eq('id', id)
@@ -61,21 +55,14 @@ export default function SignContract() {
             alert("Error signing: " + error.message)
         } else {
             setSigned(true)
-            triggerConfetti()
+            confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } })
         }
-    }
-
-    const triggerConfetti = () => {
-        // Simple visual feedback if canvas-confetti isn't installed
-        const colors = ['#2563EB', '#16a34a', '#f59e0b']
-        // This is just a placeholder for the logic where you'd fire the confetti
     }
 
     if (loading) return <div style={{height:'100vh', display:'flex', alignItems:'center', justifyContent:'center', color:'#64748b'}}>Loading Proposal...</div>
     if (error) return <div style={{padding:'40px', textAlign:'center', color:'#ef4444', fontWeight:'bold'}}>{error}</div>
 
     // Helpers
-    // --- GEMINI FIX: Added timeZone: 'UTC' to prevent the date from shifting back a day ---
     const eventDate = client.service_data?.event_date 
         ? new Date(client.service_data.event_date).toLocaleDateString('en-US', { timeZone: 'UTC', weekday:'long', year:'numeric', month:'long', day:'numeric' }) 
         : 'Date TBD'
@@ -153,7 +140,7 @@ export default function SignContract() {
                         </h3>
                         
                         {/* Selected Packages */}
-                        {menuItems.length > 0 && (
+                        {menuItems.length > 0 ? (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px', marginTop: '15px' }}>
                                 {menuItems.map(item => (
                                     <span key={item} style={{ background: '#eff6ff', color: '#1e40af', padding: '6px 12px', borderRadius: '20px', fontSize: '14px', fontWeight: '500', border:'1px solid #bfdbfe' }}>
@@ -161,14 +148,19 @@ export default function SignContract() {
                                     </span>
                                 ))}
                             </div>
+                        ) : (
+                            <div style={{ margin: '15px 0', fontSize: '14px', color: '#94a3b8', fontStyle: 'italic' }}>
+                                No specific menu items listed (General Service).
+                            </div>
                         )}
 
                         <p style={{ lineHeight: '1.6', color: '#475569', background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                            <strong>Notes: </strong>
                             {client.job_notes || 'Standard services as discussed.'}
                         </p>
                     </div>
 
-                    {/* PAYMENT SCHEDULE (NEW) */}
+                    {/* PAYMENT SCHEDULE */}
                     {paymentPlan.length > 0 && (
                         <div style={{ marginBottom: '40px' }}>
                             <h3 style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -197,14 +189,36 @@ export default function SignContract() {
                         </div>
                     )}
 
+                    {/* NEW: TERMS & CONDITIONS BOX */}
+                    <div style={{ marginBottom: '30px' }}>
+                        <h3 style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <ShieldAlert size={20} /> Terms & Conditions
+                        </h3>
+                        <div style={{ height: '150px', overflowY: 'scroll', background: '#f1f5f9', padding: '15px', borderRadius: '8px', fontSize: '12px', color: '#475569', border: '1px solid #e2e8f0', marginTop: '15px' }}>
+                            <p><strong>1. Deposit & Payments:</strong> A non-refundable deposit is required to secure the date. Full payment is due as per the schedule above. Late payments may result in service cancellation.</p>
+                            <p><strong>2. Cancellations:</strong> Cancellations made less than 30 days before the event are subject to a 50% fee. Cancellations made less than 7 days prior are non-refundable.</p>
+                            <p><strong>3. Guest Count:</strong> Final guest count must be confirmed 7 days prior to the event. This count will be used for final billing and food preparation.</p>
+                            <p><strong>4. Leftovers:</strong> Any leftover food is the responsibility of the client. We are not responsible for food safety once it has been handed over or left at the venue.</p>
+                            <p><strong>5. Liability:</strong> We are not liable for any damages to the venue or personal property unless directly caused by our staff's negligence.</p>
+                            <p><strong>6. Service Time:</strong> Service will be provided for the specific hours listed. Additional hours will incur an extra charge.</p>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
+                            <input 
+                                type="checkbox" 
+                                id="terms" 
+                                checked={agreedToTerms} 
+                                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                                style={{ width: '18px', height: '18px', cursor: 'pointer' }} 
+                            />
+                            <label htmlFor="terms" style={{ fontSize: '14px', color: '#334155', cursor: 'pointer' }}>I have read and agree to the Terms & Conditions.</label>
+                        </div>
+                    </div>
+
                     {/* SIGNATURE AREA */}
                     <div style={{ background: '#f8fafc', padding: '30px', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
                         <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '10px', color:'#0f172a' }}>
                             <PenTool size={20} /> Acceptance
                         </h3>
-                        <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '20px' }}>
-                            By typing your name below, you agree to the services, pricing, and payment schedule outlined above.
-                        </p>
                         
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '8px', color:'#475569' }}>Type Full Legal Name</label>
                         <input 
@@ -219,22 +233,19 @@ export default function SignContract() {
                             onClick={handleSign}
                             style={{ 
                                 width: '100%', padding: '18px', 
-                                background: '#2563EB', color: 'white', 
+                                background: agreedToTerms ? '#2563EB' : '#94a3b8', 
+                                color: 'white', 
                                 border: 'none', borderRadius: '10px', 
                                 fontSize: '18px', fontWeight: 'bold', 
-                                cursor: 'pointer',
+                                cursor: agreedToTerms ? 'pointer' : 'not-allowed',
                                 boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)',
-                                transition: 'transform 0.1s',
+                                transition: 'all 0.2s',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
                             }}
-                            onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'}
-                            onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+                            disabled={!agreedToTerms}
                         >
                             Accept & Sign Contract <ChevronRight size={20} />
                         </button>
-                        <div style={{textAlign:'center', marginTop:'15px', fontSize:'12px', color:'#94a3b8'}}>
-                            IP Address & Timestamp will be recorded.
-                        </div>
                     </div>
 
                 </div>
