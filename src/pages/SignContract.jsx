@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
-import { CheckCircle, PenTool, Calendar, MapPin, Clock, Users, FileText, ChevronRight, CreditCard, ShieldAlert, Utensils } from 'lucide-react'
+import { CheckCircle, PenTool, Calendar, MapPin, Clock, Users, ChevronRight, CreditCard, ShieldAlert, Utensils } from 'lucide-react'
 import confetti from 'canvas-confetti' 
 
 export default function SignContract() {
@@ -62,23 +62,18 @@ export default function SignContract() {
     if (loading) return <div style={{height:'100vh', display:'flex', alignItems:'center', justifyContent:'center', color:'#64748b'}}>Loading Proposal...</div>
     if (error) return <div style={{padding:'40px', textAlign:'center', color:'#ef4444', fontWeight:'bold'}}>{error}</div>
 
-    // --- DATA EXTRACTION HELPERS ---
+    // --- DATA EXTRACTION ---
     const eventDate = client.service_data?.event_date 
         ? new Date(client.service_data.event_date).toLocaleDateString('en-US', { timeZone: 'UTC', weekday:'long', year:'numeric', month:'long', day:'numeric' }) 
         : 'Date TBD'
         
     const paymentPlan = client.service_data?.payment_plan || []
 
-    // --- MENU LOGIC (Attempting to find the data) ---
-    // We try all common variations. If none work, the DEBUG BOX below will tell us why.
-    const serviceData = client.service_data || {}
-    const menuData = serviceData.menu || serviceData.menu_configuration || serviceData
-    
-    // Check capitalization variations
-    const entrees = menuData.entrees || menuData.Entrees || serviceData.Entrees || []
-    const sides = menuData.sides || menuData.Sides || serviceData.Sides || []
-    const drinks = menuData.drinks || menuData.Drinks || serviceData.Drinks || []
-    const legacyMenu = serviceData.selected_menu_items || []
+    // FIX: Using the exact names found in your database
+    const entrees = client.service_data?.menu_entrees || []
+    const sides = client.service_data?.menu_sides || []
+    const drinks = client.service_data?.menu_drinks || []
+    const legacyMenu = client.service_data?.selected_menu_items || []
     
     const hasMenu = entrees.length > 0 || sides.length > 0 || drinks.length > 0 || legacyMenu.length > 0
 
@@ -93,6 +88,11 @@ export default function SignContract() {
                 <p style={{ color: '#64748b', fontSize:'18px', lineHeight:'1.6' }}>
                     Thank you, {client.full_name}.<br/>Your event is officially booked.
                 </p>
+                <div style={{ marginTop: '40px', padding: '25px', background: '#f8fafc', borderRadius: '16px', border:'1px solid #e2e8f0', textAlign:'left' }}>
+                    <div style={{fontSize:'12px', textTransform:'uppercase', color:'#94a3b8', fontWeight:'bold', marginBottom:'5px'}}>Digital Signature</div>
+                    <div style={{fontSize:'20px', fontWeight:'bold', fontFamily:'monospace', color:'#334155'}}>{client.service_data?.signed_by || signature}</div>
+                    <div style={{fontSize:'14px', color:'#64748b', marginTop:'5px'}}>{new Date(client.service_data?.signed_at || new Date()).toLocaleString()}</div>
+                </div>
             </div>
         )
     }
@@ -104,10 +104,14 @@ export default function SignContract() {
                 
                 {/* HERO HEADER */}
                 <div style={{ background: '#0f172a', padding: '40px', color: 'white', position: 'relative' }}>
+                    <div style={{ fontSize: '14px', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Service Proposal</div>
                     <h1 style={{ margin: '10px 0', fontSize: '32px' }}>{client.full_name}</h1>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginTop: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginTop: '20px', flexWrap: 'wrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.1)', padding: '8px 15px', borderRadius: '20px', fontSize: '14px' }}>
                             <Calendar size={16} /> {eventDate}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.1)', padding: '8px 15px', borderRadius: '20px', fontSize: '14px' }}>
+                            <Clock size={16} /> {client.service_data?.event_time || 'TBD'}
                         </div>
                     </div>
                 </div>
@@ -116,6 +120,18 @@ export default function SignContract() {
                     
                     {/* KEY DETAILS GRID */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '30px', marginBottom: '40px' }}>
+                        <div>
+                            <div style={{ color: '#64748b', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px' }}>Location</div>
+                            <div style={{ fontSize: '16px', fontWeight: '500', color: '#334155', display:'flex', gap:'8px' }}>
+                                <MapPin size={20} color="#2563EB"/> {client.address}
+                            </div>
+                        </div>
+                        <div>
+                            <div style={{ color: '#64748b', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px' }}>Guest Count</div>
+                            <div style={{ fontSize: '16px', fontWeight: '500', color: '#334155', display:'flex', gap:'8px' }}>
+                                <Users size={20} color="#2563EB"/> {client.service_data?.guest_count || 0} People
+                            </div>
+                        </div>
                         <div>
                             <div style={{ color: '#64748b', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px' }}>Total Investment</div>
                             <div style={{ fontSize: '24px', fontWeight: '900', color: '#16a34a' }}>
@@ -160,6 +176,16 @@ export default function SignContract() {
                                         ))}
                                     </div>
                                 )}
+                                
+                                {legacyMenu.length > 0 && (
+                                    <div>
+                                        <div style={{fontSize:'12px', fontWeight:'bold', color:'#94a3b8', textTransform:'uppercase', marginBottom:'8px'}}>Included Items</div>
+                                        {legacyMenu.map((item, i) => (
+                                            <div key={i} style={{marginBottom:'5px', fontWeight:'500', color:'#334155'}}>• {item}</div>
+                                        ))}
+                                    </div>
+                                )}
+
                             </div>
                         ) : (
                             <div style={{ margin: '15px 0', fontSize: '14px', color: '#94a3b8', fontStyle: 'italic' }}>
@@ -172,13 +198,6 @@ export default function SignContract() {
                             {client.job_notes || 'Standard services as discussed.'}
                         </p>
                     </div>
-
-                    {/* --- DEBUG BOX: REMOVE THIS AFTER FIXING --- */}
-                    <div style={{ background: '#222', color: '#0f0', padding: '20px', borderRadius: '10px', marginTop: '50px', fontSize: '12px', overflowX: 'auto' }}>
-                        <h4 style={{ margin: '0 0 10px 0', color: '#fff' }}>DEBUG MODE: DATABASE DATA</h4>
-                        <pre>{JSON.stringify(client.service_data, null, 2)}</pre>
-                    </div>
-                    {/* ----------------------------------------- */}
 
                     {/* PAYMENT SCHEDULE */}
                     {paymentPlan.length > 0 && (
@@ -196,17 +215,32 @@ export default function SignContract() {
                                                 <div style={{fontSize:'12px', color:'#64748b'}}>Due: {pay.date || 'TBD'}</div>
                                             </div>
                                         </div>
+                                        <div style={{display:'flex', alignItems:'center'}}>
+                                            {pay.paid ? (
+                                                <span style={{background:'#dcfce7', color:'#16a34a', fontSize:'12px', fontWeight:'bold', padding:'4px 10px', borderRadius:'20px'}}>PAID</span>
+                                            ) : (
+                                                <span style={{background:'#f1f5f9', color:'#64748b', fontSize:'12px', fontWeight:'bold', padding:'4px 10px', borderRadius:'20px'}}>UNPAID</span>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     )}
 
-                    {/* TERMS & SIGNATURE (Simplified for Debug) */}
-                     <div style={{ marginTop: '30px' }}>
+                    {/* TERMS & CONDITIONS BOX */}
+                    <div style={{ marginBottom: '30px' }}>
                         <h3 style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <ShieldAlert size={20} /> Terms & Conditions
                         </h3>
+                        <div style={{ height: '150px', overflowY: 'scroll', background: '#f1f5f9', padding: '15px', borderRadius: '8px', fontSize: '12px', color: '#475569', border: '1px solid #e2e8f0', marginTop: '15px' }}>
+                            <p><strong>1. Deposit & Payments:</strong> A non-refundable deposit is required to secure the date. Full payment is due as per the schedule above. Late payments may result in service cancellation.</p>
+                            <p><strong>2. Cancellations:</strong> Cancellations made less than 30 days before the event are subject to a 50% fee. Cancellations made less than 7 days prior are non-refundable.</p>
+                            <p><strong>3. Guest Count:</strong> Final guest count must be confirmed 7 days prior to the event. This count will be used for final billing and food preparation.</p>
+                            <p><strong>4. Leftovers:</strong> Any leftover food is the responsibility of the client. We are not responsible for food safety once it has been handed over or left at the venue.</p>
+                            <p><strong>5. Liability:</strong> We are not liable for any damages to the venue or personal property unless directly caused by our staff's negligence.</p>
+                            <p><strong>6. Service Time:</strong> Service will be provided for the specific hours listed. Additional hours will incur an extra charge.</p>
+                        </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
                             <input 
                                 type="checkbox" 
@@ -219,7 +253,12 @@ export default function SignContract() {
                         </div>
                     </div>
 
-                    <div style={{ background: '#f8fafc', padding: '30px', borderRadius: '16px', border: '1px dashed #cbd5e1', marginTop: '20px' }}>
+                    {/* SIGNATURE AREA */}
+                    <div style={{ background: '#f8fafc', padding: '30px', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
+                        <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '10px', color:'#0f172a' }}>
+                            <PenTool size={20} /> Acceptance
+                        </h3>
+                        
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '8px', color:'#475569' }}>Type Full Legal Name</label>
                         <input 
                             type="text" 
@@ -228,6 +267,7 @@ export default function SignContract() {
                             onChange={e => setSignature(e.target.value)}
                             style={{ width: '100%', padding: '15px', fontSize: '18px', borderRadius: '8px', border: '1px solid #94a3b8', fontFamily: 'monospace', marginBottom: '20px', boxSizing: 'border-box' }}
                         />
+
                         <button 
                             onClick={handleSign}
                             style={{ 
@@ -237,10 +277,13 @@ export default function SignContract() {
                                 border: 'none', borderRadius: '10px', 
                                 fontSize: '18px', fontWeight: 'bold', 
                                 cursor: agreedToTerms ? 'pointer' : 'not-allowed',
+                                boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)',
+                                transition: 'all 0.2s',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
                             }}
                             disabled={!agreedToTerms}
                         >
-                            Accept & Sign Contract
+                            Accept & Sign Contract <ChevronRight size={20} />
                         </button>
                     </div>
 
