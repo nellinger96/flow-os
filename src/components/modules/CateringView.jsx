@@ -1,13 +1,13 @@
-import { Calendar, Clock, Users, DollarSign, Trash2 } from 'lucide-react'
+import { Calendar, Clock, Users, DollarSign, Trash2, Link as LinkIcon, ExternalLink, CheckCircle, FileText } from 'lucide-react'
 
 export default function CateringView({ formData, setFormData, clientId }) {
     
-    // Helper to update deeply nested "service_data"
+    // Helper to update deeply nested "service_data" safely
     function updateServiceData(field, value) {
         setFormData({
             ...formData,
             service_data: {
-                ...formData.service_data,
+                ...(formData.service_data || {}), // Keep existing data
                 [field]: value
             }
         })
@@ -23,27 +23,54 @@ export default function CateringView({ formData, setFormData, clientId }) {
     }
 
     const s = formData.service_data || {}
+    const contractUrl = `${window.location.origin}/sign/${clientId}`
+    const isSigned = formData.status === 'booked'
+
+    function copyContractLink() {
+        navigator.clipboard.writeText(contractUrl)
+        alert("Contract Link Copied to Clipboard!")
+    }
 
     return (
         <div style={{ display: 'grid', gap: '20px' }}>
             
-            {/* STATUS TRACKING */}
-            <div style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginBottom: '10px', textTransform: 'uppercase' }}>Tracking Status</div>
-                <div style={{ display: 'flex', gap: '5px', background: '#f1f5f9', padding: '5px', borderRadius: '8px' }}>
-                    {['lead', 'tasting', 'proposal', 'booked'].map(step => (
-                        <button 
-                            key={step}
-                            onClick={() => setFormData({ ...formData, status: step })}
-                            style={{ flex: 1, padding: '8px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', textTransform: 'capitalize', background: formData.status === step ? (step === 'booked' ? '#16a34a' : '#2563EB') : 'transparent', color: formData.status === step ? 'white' : '#64748b', transition: '0.2s' }}
-                        >
-                            {step}
-                        </button>
-                    ))}
+            {/* STATUS & CONTRACT HEADER */}
+            <div style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'15px' }}>
+                <div>
+                    <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginBottom: '5px', textTransform: 'uppercase' }}>Current Status</div>
+                    <div style={{ display: 'flex', gap: '5px', background: '#f1f5f9', padding: '5px', borderRadius: '8px' }}>
+                        {['lead', 'tasting', 'proposal', 'booked'].map(step => (
+                            <button 
+                                key={step}
+                                onClick={() => setFormData({ ...formData, status: step })}
+                                style={{ 
+                                    padding: '6px 12px', 
+                                    borderRadius: '6px', 
+                                    border: 'none', 
+                                    cursor: 'pointer', 
+                                    fontSize: '12px', 
+                                    fontWeight: 'bold', 
+                                    textTransform: 'capitalize', 
+                                    background: formData.status === step ? (step === 'booked' ? '#16a34a' : '#2563EB') : 'transparent', 
+                                    color: formData.status === step ? 'white' : '#64748b', 
+                                    transition: '0.2s'
+                                }}
+                            >
+                                {step}
+                            </button>
+                        ))}
+                    </div>
                 </div>
+
+                {/* SIGNED INDICATOR */}
+                {isSigned && (
+                    <div style={{ padding:'10px 15px', background:'#dcfce7', color:'#166534', borderRadius:'8px', display:'flex', alignItems:'center', gap:'8px', fontWeight:'bold', fontSize:'14px' }}>
+                        <CheckCircle size={18} /> Contract Signed
+                    </div>
+                )}
             </div>
 
-            {/* EVENT DETAILS (Added End Time Here) */}
+            {/* EVENT DETAILS */}
             <div style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px' }}>
                     
@@ -93,7 +120,7 @@ export default function CateringView({ formData, setFormData, clientId }) {
                 </div>
             </div>
 
-            {/* FINANCIALS (FIXED: NOW SAVES TO DATABASE) */}
+            {/* FINANCIALS */}
             <div style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                 <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#334155' }}>Payment Schedule</h3>
                 
@@ -118,7 +145,7 @@ export default function CateringView({ formData, setFormData, clientId }) {
                 </div>
             </div>
 
-            {/* MENUS (Simplified for length - logic handles adding/removing) */}
+            {/* MENUS */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
                 {['Entrees', 'Sides', 'Drinks'].map(cat => {
                     const key = `menu_${cat.toLowerCase()}`
@@ -157,6 +184,39 @@ export default function CateringView({ formData, setFormData, clientId }) {
                     onChange={e => updateServiceData('notes', e.target.value)} 
                     style={{ width: '100%', height: '100px', padding: '15px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', fontFamily: 'sans-serif', resize: 'vertical', boxSizing: 'border-box' }}
                 />
+            </div>
+
+            {/* CONTRACT & LINKS (ADDED BACK) */}
+            <div style={{ background: '#f0f9ff', padding: '20px', borderRadius: '12px', border: '1px solid #bae6fd' }}>
+                <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#0369a1', display:'flex', alignItems:'center', gap:'8px' }}>
+                    <FileText size={18} /> Contract & Files
+                </h3>
+                
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <button 
+                        onClick={copyContractLink}
+                        style={{ background: 'white', border: '1px solid #0ea5e9', color: '#0284c7', padding: '10px 15px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    >
+                        <LinkIcon size={16} /> Copy Link
+                    </button>
+
+                    <button 
+                        onClick={() => window.open(contractUrl, '_blank')}
+                        style={{ background: '#0284c7', border: 'none', color: 'white', padding: '10px 15px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    >
+                        <ExternalLink size={16} /> Open Contract
+                    </button>
+                </div>
+                
+                {isSigned ? (
+                     <div style={{ marginTop:'15px', fontSize:'13px', color:'#15803d' }}>
+                        ✓ Contract is marked as <strong>Signed (Booked)</strong>.
+                     </div>
+                ) : (
+                    <div style={{ marginTop:'15px', fontSize:'13px', color:'#64748b' }}>
+                        ⚠ Contract is waiting for signature.
+                    </div>
+                )}
             </div>
 
         </div>
