@@ -8,8 +8,6 @@ export default function SignContract() {
     const [client, setClient] = useState(null)
     const [loading, setLoading] = useState(true)
     const [signed, setSigned] = useState(false)
-    
-    // Signature State
     const [signatureName, setSignatureName] = useState('')
 
     useEffect(() => { fetchContract() }, [])
@@ -18,7 +16,8 @@ export default function SignContract() {
         const { data } = await supabase.from('customers').select('*').eq('id', id).single()
         if (data) {
             setClient(data)
-            if (data.status === 'booked') setSigned(true)
+            // Check for 'booked' status (case insensitive)
+            if ((data.status || '').toLowerCase() === 'booked') setSigned(true)
         }
         setLoading(false)
     }
@@ -29,11 +28,7 @@ export default function SignContract() {
         
         const { error } = await supabase
             .from('customers')
-            .update({ 
-                status: 'booked',
-                // Optional: You could save the signature name to a new column in the future
-                // signature: signatureName 
-            })
+            .update({ status: 'booked' })
             .eq('id', id)
             
         if (!error) {
@@ -42,23 +37,24 @@ export default function SignContract() {
         }
     }
 
-    function formatTime(time24) {
-        if (!time24) return ''
-        let [hours, minutes] = time24.split(':').map(Number)
-        const ampm = hours >= 12 ? 'PM' : 'AM'
-        const h12 = hours % 12 || 12
-        return `${h12}:${minutes.toString().padStart(2, '0')} ${ampm}`
-    }
-
-    function getServiceRange(start, end) {
-        if (!start) return 'Time TBD'
-        return `${formatTime(start)} - ${end ? formatTime(end) : 'End TBD'}`
-    }
-
     if (loading) return <div style={{display:'flex', justifyContent:'center', marginTop:'50px'}}><Loader2 className="spin" /></div>
     if (!client) return <div>Contract not found.</div>
 
+    // --- DATA TRANSLATOR (Reads Old & New Data) ---
     const s = client.service_data || {}
+
+    // Dates & Times
+    const eventDate = s.event_date || s.service_date || 'TBD'
+    // If time is just "16:30", convert to "4:30 PM". If already "4:30 PM", keep it.
+    const startTime = s.start_time || s.service_time || 'TBD'
+    const endTime = s.end_time || s.service_end_time || '' 
+    
+    // Payments (Checks Old Keys AND New Keys)
+    const p1_date = s.payment_1_date || s.deposit_date || 'TBD'
+    const p1_amount = s.payment_1_amount || s.deposit_amount || '0'
+    
+    const p2_date = s.payment_2_date || s.final_payment_date || 'TBD'
+    const p2_amount = s.payment_2_amount || s.final_payment_amount || '0'
 
     return (
         <div style={{ maxWidth: '800px', margin: '40px auto', fontFamily: 'sans-serif', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0' }}>
@@ -69,10 +65,10 @@ export default function SignContract() {
                 <h1 style={{ fontSize: '32px', margin: '0 0 10px 0', fontWeight: '800' }}>{client.full_name}</h1>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginTop: '20px' }}>
                     <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 16px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
-                        <Calendar size={16} /> {s.service_date || 'Date TBD'}
+                        <Calendar size={16} /> {eventDate}
                     </div>
                     <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 16px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
-                        <Clock size={16} /> {getServiceRange(s.service_time, s.service_end_time)}
+                        <Clock size={16} /> {startTime} {endTime ? `- ${endTime}` : ''}
                     </div>
                 </div>
             </div>
@@ -93,7 +89,7 @@ export default function SignContract() {
                 </div>
                 <div>
                     <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase' }}>Total Investment</div>
-                    <div style={{ marginTop: '5px', fontWeight: '800', color: '#059669', fontSize: '24px' }}>${client.job_price || 0}</div>
+                    <div style={{ marginTop: '5px', fontWeight: '800', color: '#059669', fontSize: '24px' }}>${(parseFloat(s.price_per_head || 0) * parseFloat(s.guest_count || 0)).toLocaleString()}</div>
                 </div>
             </div>
 
@@ -123,35 +119,33 @@ export default function SignContract() {
                     </div>
                 </div>
 
-                {/* 5. PAYMENTS */}
+                {/* 5. PAYMENTS (Now Reading Old & New Data) */}
                 <h3 style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', marginBottom: '20px', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <DollarSign size={20} /> Payment Schedule
                 </h3>
                 <div style={{ display: 'flex', gap: '20px', marginBottom: '40px' }}>
                     <div style={{ flex: 1, padding: '15px', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-                        <div style={{ fontSize: '12px', color: '#64748b' }}>Deposit Due: {s.deposit_date || 'TBD'}</div>
-                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155' }}>${s.deposit_amount || '0'}</div>
+                        <div style={{ fontSize: '12px', color: '#64748b' }}>Deposit Due: {p1_date}</div>
+                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155' }}>${p1_amount}</div>
                     </div>
                     <div style={{ flex: 1, padding: '15px', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-                        <div style={{ fontSize: '12px', color: '#64748b' }}>Final Due: {s.final_payment_date || 'TBD'}</div>
-                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155' }}>${s.final_payment_amount || '0'}</div>
+                        <div style={{ fontSize: '12px', color: '#64748b' }}>Final Due: {p2_date}</div>
+                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155' }}>${p2_amount}</div>
                     </div>
                 </div>
 
-                {/* 6. TERMS AND CONDITIONS (ADDED BACK) */}
+                {/* 6. TERMS */}
                 <div style={{ marginBottom: '40px' }}>
                      <h3 style={{ fontSize: '16px', marginBottom: '10px' }}>Terms & Conditions</h3>
                      <div style={{ height: '150px', overflowY: 'auto', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '15px', borderRadius: '8px', fontSize: '12px', color: '#64748b', lineHeight: '1.6' }}>
-                        <p><strong>1. Deposit & Payment:</strong> A non-refundable deposit is required to secure the date. The remaining balance is due on or before the event date as specified in the payment schedule.</p>
-                        <p><strong>2. Service Time:</strong> Service will be provided for the specific hours listed above. Additional hours may be requested for an additional fee.</p>
+                        <p><strong>1. Deposit & Payment:</strong> A non-refundable deposit is required to secure the date.</p>
+                        <p><strong>2. Service Time:</strong> Service will be provided for the specific hours listed above.</p>
                         <p><strong>3. Cancellations:</strong> Cancellations made less than 7 days prior to the event may forfeit the full deposit.</p>
-                        <p><strong>4. Leftovers:</strong> Any leftover food deemed safe for consumption will be left with the client in disposable containers.</p>
-                        <p><strong>5. Setup:</strong> The caterer will arrive approximately 1 hour prior to service time for setup.</p>
-                        <p><strong>6. Liability:</strong> The client is responsible for providing a safe environment for service staff.</p>
+                        <p><strong>4. Liability:</strong> The client is responsible for providing a safe environment for service staff.</p>
                      </div>
                 </div>
 
-                {/* 7. SIGNATURE BOX (ADDED BACK) */}
+                {/* 7. SIGNATURE */}
                 <div style={{ padding: '30px', background: '#f1f5f9', borderTop: '1px solid #e2e8f0', borderRadius: '12px' }}>
                     {signed ? (
                         <div style={{ textAlign:'center' }}>
