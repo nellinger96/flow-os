@@ -16,10 +16,14 @@ export default function Analytics() {
     }, [])
 
     async function calculateMetrics() {
-        // Fetch all customers who have a price set (real jobs)
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        // SECURITY FIX: Filter by user_id
         const { data: customers } = await supabase
             .from('customers')
             .select('*')
+            .eq('user_id', user.id) // <--- CRITICAL SECURITY LOCK
             .not('job_price', 'is', null) 
         
         if (!customers || customers.length === 0) {

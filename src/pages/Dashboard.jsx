@@ -12,13 +12,13 @@ export default function Dashboard() {
     // Display Stats State
     const [stats, setStats] = useState({ 
         clients: 0, 
-        revenueDisplay: 0, // This changes based on filter
+        revenueDisplay: 0, 
         todayEvents: 0,
         leads: 0, tastings: 0, proposals: 0, sold: 0
     })
 
     // Filters
-    const [revenueScope, setRevenueScope] = useState('year') // 'all', 'year', 'month', 'week', 'day'
+    const [revenueScope, setRevenueScope] = useState('year')
     const [weather, setWeather] = useState({ temp: '--', condition: 'Loading...' })
     
     const navigate = useNavigate()
@@ -26,12 +26,13 @@ export default function Dashboard() {
     useEffect(() => {
         // 1. Get User & Weather
         supabase.auth.getUser().then(({ data: { user } }) => {
-            setUser(user)
-            fetchWeather(user?.user_metadata?.city)
+            if (user) {
+                setUser(user)
+                fetchWeather(user?.user_metadata?.city)
+                // 2. Fetch Data (Only after we have the user)
+                fetchData(user.id)
+            }
         })
-        
-        // 2. Fetch Data
-        fetchData()
     }, [])
 
     // --- 3. RE-CALCULATE REVENUE WHEN FILTER CHANGES ---
@@ -41,8 +42,14 @@ export default function Dashboard() {
         }
     }, [revenueScope, rawClients])
 
-    async function fetchData() {
-        const { data: clients } = await supabase.from('customers').select('job_price, service_data, status, created_at')
+    async function fetchData(userId) {
+        // SECURITY FIX: We now require userId to run this
+        if (!userId) return
+
+        const { data: clients } = await supabase
+            .from('customers')
+            .select('job_price, service_data, status, created_at')
+            .eq('user_id', userId) // <--- CRITICAL SECURITY LOCK ADDED HERE
         
         if (clients) {
             setRawClients(clients) // Store raw data for filtering later
@@ -50,13 +57,20 @@ export default function Dashboard() {
             // Standard Metrics (Counts)
             const totalClients = clients.length
             const todayStr = new Date().toISOString().split('T')[0]
-            const todayCount = clients.filter(c => c.service_data?.event_date === todayStr).length
+            
+            // Check both potential date locations
+            const todayCount = clients.filter(c => {
+                const d = c.service_data?.event_date || c.service_data?.service_date
+                return d === todayStr
+            }).length
 
             // Pipeline Counts
             const leads = clients.filter(c => !c.status || c.status === 'lead').length
             const tastings = clients.filter(c => c.status === 'tasting').length
             const proposals = clients.filter(c => c.status === 'proposal').length
-            const sold = clients.filter(c => c.status === 'sold').length
+            
+            // Check for 'sold' OR 'booked' since we used both terms recently
+            const sold = clients.filter(c => c.status === 'sold' || c.status === 'booked').length
 
             setStats(prev => ({ 
                 ...prev,
@@ -81,7 +95,8 @@ export default function Dashboard() {
 
         const filteredClients = clients.filter(c => {
             // Use event_date if available, otherwise created_at
-            const dateStr = c.service_data?.event_date || c.created_at
+            // Also checking service_date just in case
+            const dateStr = c.service_data?.event_date || c.service_data?.service_date || c.created_at
             if (!dateStr) return false
             const date = new Date(dateStr)
 
@@ -93,7 +108,7 @@ export default function Dashboard() {
             return true
         })
 
-        const newTotal = filteredClients.reduce((sum, c) => sum + (c.job_price || 0), 0)
+        const newTotal = filteredClients.reduce((sum, c) => sum + (parseFloat(c.job_price) || 0), 0)
         setStats(prev => ({ ...prev, revenueDisplay: newTotal }))
     }
 

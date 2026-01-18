@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient'
 import { ChevronLeft, ChevronRight, Calendar as CalIcon, Clock, MapPin } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
-export default function Calendar() {
+export default function CalendarPage() {
     const [events, setEvents] = useState([])
     const [currentDate, setCurrentDate] = useState(new Date())
     const [loading, setLoading] = useState(true)
@@ -15,10 +15,15 @@ export default function Calendar() {
     }, [])
 
     async function fetchEvents() {
-        // Fetch everyone, then filter for those who have dates
+        // 1. Get the current user
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        // 2. Fetch customers ONLY for this user
         const { data } = await supabase
             .from('customers')
             .select('id, full_name, status, address, service_data')
+            .eq('user_id', user.id) // <--- CRITICAL SECURITY LOCK
         
         const validEvents = data?.filter(c => c.service_data?.event_date) || []
         setEvents(validEvents)
@@ -96,7 +101,7 @@ export default function Calendar() {
                             {/* EVENT CHIPS */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 {dayEvents.map(ev => {
-                                    const isSold = ev.status === 'sold'
+                                    const isSold = ev.status === 'sold' || ev.status === 'booked'
                                     return (
                                         <div key={ev.id} style={{ 
                                             fontSize: '11px', 
@@ -130,7 +135,7 @@ export default function Calendar() {
                         
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             {selectedDayEvents.events.map(ev => (
-                                <div key={ev.id} style={{ padding: '15px', background: '#f8fafc', borderRadius: '8px', borderLeft: ev.status === 'sold' ? '4px solid #16a34a' : '4px solid #2563EB' }}>
+                                <div key={ev.id} style={{ padding: '15px', background: '#f8fafc', borderRadius: '8px', borderLeft: (ev.status === 'sold' || ev.status === 'booked') ? '4px solid #16a34a' : '4px solid #2563EB' }}>
                                     <div style={{ fontWeight: 'bold', fontSize: '16px' }}>{ev.full_name}</div>
                                     <div style={{ fontSize: '13px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '5px' }}>
                                         <Clock size={14}/> {ev.service_data?.event_time || 'No time set'}
@@ -138,7 +143,7 @@ export default function Calendar() {
                                     <div style={{ fontSize: '13px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
                                         <MapPin size={14}/> {ev.address}
                                     </div>
-                                    <div style={{marginTop:'8px', fontSize:'12px', fontWeight:'bold', color: ev.status === 'sold' ? '#16a34a' : '#2563EB', textTransform:'uppercase'}}>
+                                    <div style={{marginTop:'8px', fontSize:'12px', fontWeight:'bold', color: (ev.status === 'sold' || ev.status === 'booked') ? '#16a34a' : '#2563EB', textTransform:'uppercase'}}>
                                         STATUS: {ev.status}
                                     </div>
                                 </div>

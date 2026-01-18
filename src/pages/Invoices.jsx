@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useNavigate } from 'react-router-dom'
-import { DollarSign, FileText, AlertCircle, CheckCircle, ArrowRight, Calendar } from 'lucide-react'
+import { DollarSign, AlertCircle, ArrowRight, Calendar } from 'lucide-react'
 
 export default function Invoices() {
     const [invoices, setInvoices] = useState([])
@@ -14,23 +14,51 @@ export default function Invoices() {
     }, [])
 
     async function fetchInvoices() {
-        // Get all clients with their payment plans and pricing
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        // SECURITY LOCK: Only fetch my clients
         const { data: clients } = await supabase
             .from('customers')
             .select('id, full_name, job_price, service_data, status')
+            .eq('user_id', user.id) // <--- CRITICAL SECURITY FIX
             .order('created_at', { ascending: false })
 
         if (clients) {
             const processed = clients.map(client => {
-                const total = parseFloat(client.job_price) || 0
-                const plan = client.service_data?.payment_plan || []
+                const s = client.service_data || {}
                 
-                // Calculate how much they have paid
-                const paidAmount = plan.reduce((sum, item) => item.paid ? sum + (parseFloat(item.amount) || 0) : sum, 0)
+                // 1. Calculate Total Job Price
+                // Try the main column, then try calculating from service_data
+                let total = parseFloat(client.job_price)
+                if (isNaN(total) || total === 0) {
+                    total = (parseFloat(s.price_per_head) || 0) * (parseFloat(s.guest_count) || 0)
+                }
+
+                // 2. Calculate Paid Amount (Using the "Safe Mode" keys from Directory)
+                let paidAmount = 0
+                
+                // Payment 1 (Deposit)
+                const p1Amount = parseFloat(s.payment_1_amount || s.deposit_amount || 0)
+                const p1Paid = (s.payment_1_status || s.deposit_status || '').toLowerCase() === 'paid'
+                if (p1Paid) paidAmount += p1Amount
+
+                // Payment 2 (Final)
+                const p2Amount = parseFloat(s.payment_2_amount || s.final_payment_amount || 0)
+                const p2Paid = (s.payment_2_status || s.final_payment_status || '').toLowerCase() === 'paid'
+                if (p2Paid) paidAmount += p2Amount
+
+                // Check for Payment Plan Array (Legacy support)
+                if (paidAmount === 0 && Array.isArray(s.payment_plan)) {
+                     paidAmount = s.payment_plan.reduce((sum, item) => item.paid ? sum + (parseFloat(item.amount) || 0) : sum, 0)
+                }
+
                 const balance = total - paidAmount
-                const eventDate = client.service_data?.event_date || 'TBD'
                 
-                // Determine status
+                // Date handling (Safe Mode)
+                const eventDate = s.event_date || s.service_date || 'TBD'
+                
+                // Determine Status
                 let status = 'Unpaid'
                 if (balance <= 0 && total > 0) status = 'Paid'
                 else if (paidAmount > 0) status = 'Partial'
@@ -39,18 +67,17 @@ export default function Invoices() {
                     id: client.id,
                     name: client.full_name,
                     date: eventDate,
-                    total,
+                    total: total || 0,
                     paid: paidAmount,
-                    balance,
+                    balance: balance > 0 ? balance : 0,
                     status
                 }
             })
 
-            // Filter to show only active jobs (optional, but good for focus) or just all
             setInvoices(processed)
 
             // Calculate Metrics
-            const outstanding = processed.reduce((sum, inv) => sum + (inv.balance > 0 ? inv.balance : 0), 0)
+            const outstanding = processed.reduce((sum, inv) => sum + inv.balance, 0)
             const count = processed.filter(inv => inv.balance > 0).length
             
             setMetrics({ totalOutstanding: outstanding, overdueCount: count })
@@ -72,7 +99,7 @@ export default function Invoices() {
             {/* METRICS CARDS */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '40px' }}>
                 
-                {/* CARD 1: OUTSTANDING */}
+                {/* OUTSTANDING */}
                 <div style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '10px' }}>
                         <div style={{ background: '#fee2e2', padding: '10px', borderRadius: '8px', color: '#ef4444' }}><AlertCircle size={24}/></div>
@@ -82,7 +109,7 @@ export default function Invoices() {
                     <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '5px' }}>Across {metrics.overdueCount} active jobs</div>
                 </div>
 
-                {/* CARD 2: TOTAL REVENUE (Just a simple sum for context) */}
+                {/* TOTAL REVENUE */}
                 <div style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '10px' }}>
                         <div style={{ background: '#dcfce7', padding: '10px', borderRadius: '8px', color: '#16a34a' }}><DollarSign size={24}/></div>
@@ -151,9 +178,7 @@ export default function Invoices() {
                                     </td>
                                     <td style={{ padding: '15px 20px', textAlign: 'center' }}>
                                         <button 
-                                            onClick={() => navigate(`/clients?id=${inv.id}`)} // This query param trick requires updating Clients.jsx to handle auto-select, or just link to directory
-                                            // Simpler approach for now:
-                                            // onClick={() => navigate('/clients')} 
+                                            onClick={() => navigate('/clients')} 
                                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1' }}
                                             title="View Details"
                                         >
