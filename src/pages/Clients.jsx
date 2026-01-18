@@ -1,26 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
-import { Plus, Search, MapPin, Phone, Mail, User, Save, Trash2, Loader2, ArrowLeft, ShoppingBag, X } from 'lucide-react'
+import { Plus, Search, MapPin, Phone, Mail, User, Save, Trash2, Loader2, ArrowLeft, ShoppingBag, X, ChefHat } from 'lucide-react'
 import CateringView from '../components/modules/CateringView'
-
-// --- 1. THE GROCERY MATH ENGINE ---
-const INGREDIENT_DB = {
-    // Entrees (Per Person Quantities)
-    "Pollo Enchilado": { "Chicken Thighs": "0.5 lb", "Guajillo Chiles": "0.1 oz", "Garlic": "0.5 clove" },
-    "Birria": { "Beef Chuck": "0.6 lb", "Dried Chiles": "0.2 oz", "Onion": "0.1 unit" },
-    "Carne Asada": { "Flap Meat (Ranchera)": "0.5 lb", "Lime": "0.5 unit", "Seasoning": "1 tsp" },
-    "Fajitas de Camaron": { "Shrimp (Large)": "0.4 lb", "Bell Peppers": "0.2 unit", "Onion": "0.1 unit" },
-    "Fajitas de Pollo": { "Chicken Breast": "0.5 lb", "Bell Peppers": "0.2 unit", "Onion": "0.1 unit" },
-    
-    // Sides
-    "Arroz": { "Rice": "0.25 cups", "Tomato Sauce": "0.1 oz", "Oil": "1 tbsp" },
-    "Frijoles": { "Pinto Beans (Dry)": "0.15 lb", "Oil/Lard": "1 tbsp" },
-    "Ensalada de Nopales": { "Nopales": "0.2 lb", "Tomato": "0.1 unit", "Onion": "0.05 unit" },
-    "Salsa Roja": { "Tomatoes": "0.1 unit", "Chiles de Arbol": "2 units" },
-    "Salsa Verde": { "Tomatillos": "2 units", "Jalapenos": "0.5 unit" },
-    "Tortillas": { "Corn Tortillas": "3 units" }
-}
 
 export default function Clients() {
     const [clients, setClients] = useState([])
@@ -28,8 +10,12 @@ export default function Clients() {
     const [search, setSearch] = useState('')
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
-    const [showGrocery, setShowGrocery] = useState(false) // Toggle for modal
     const [searchParams, setSearchParams] = useSearchParams()
+    
+    // --- AI GROCERY STATE ---
+    const [showGrocery, setShowGrocery] = useState(false)
+    const [groceryList, setGroceryList] = useState([])
+    const [aiLoading, setAiLoading] = useState(false)
 
     useEffect(() => { fetchClients() }, [])
 
@@ -115,48 +101,40 @@ export default function Clients() {
         setSearchParams({})
     }
 
-    // --- GROCERY CALCULATOR ---
-    function calculateGroceries() {
-        if (!selectedClient) return []
+    // --- AI GENERATOR FUNCTION ---
+    async function generateAiGroceryList() {
+        if (!selectedClient) return
+        const guestCount = selectedClient.service_data?.guest_count || 0
         
-        const guestCount = parseInt(selectedClient.service_data?.guest_count || 0)
-        if (guestCount === 0) return []
-
-        // Gather all menu items into one list
-        const allItems = [
+        // Collect all menu items
+        const menuItems = [
             ...(selectedClient.service_data?.menu_entrees || []),
             ...(selectedClient.service_data?.menu_sides || []),
-            // Add default items everyone gets
-            "Tortillas", 
-            "Salsa Roja",
-            "Salsa Verde"
+            ...(selectedClient.service_data?.menu_drinks || []),
+            ...(selectedClient.service_data?.selected_menu_items || [])
         ]
 
-        let shoppingList = {}
+        if (guestCount === 0 || menuItems.length === 0) {
+            // Don't run AI if no data
+            return
+        }
 
-        allItems.forEach(item => {
-            const recipe = INGREDIENT_DB[item]
-            if (recipe) {
-                Object.keys(recipe).forEach(ingredient => {
-                    // Extract number from string (e.g. "0.5 lb" -> 0.5)
-                    const baseQty = parseFloat(recipe[ingredient])
-                    const unit = recipe[ingredient].replace(/[\d\.\s]/g, '')
-                    
-                    const totalNeeded = baseQty * guestCount
-                    
-                    if (!shoppingList[ingredient]) {
-                        shoppingList[ingredient] = { qty: 0, unit: unit }
-                    }
-                    shoppingList[ingredient].qty += totalNeeded
-                })
-            }
+        setAiLoading(true)
+        setGroceryList([]) // Clear old list
+
+        // Call the Edge Function we just deployed
+        const { data, error } = await supabase.functions.invoke('grocery-ai', {
+            body: { guest_count: guestCount, menu_items: menuItems }
         })
 
-        return Object.entries(shoppingList).map(([name, data]) => ({
-            name,
-            qty: Math.ceil(data.qty), // Round up to be safe
-            unit: data.unit
-        }))
+        setAiLoading(false)
+
+        if (error) {
+            console.error(error)
+            alert("AI Error: " + error.message)
+        } else {
+            setGroceryList(data)
+        }
     }
 
     const filteredClients = clients.filter(c => 
@@ -218,8 +196,11 @@ export default function Clients() {
                                 <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '10px' }}>
                                     <button onClick={deleteClient} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #fee2e2', background: 'white', color: '#ef4444', flex: 1 }}><Trash2 size={20} /></button>
                                     
-                                    {/* NEW GROCERY BUTTON */}
-                                    <button onClick={() => setShowGrocery(true)} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', color: '#2563EB', flex: 2, display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', fontWeight:'bold' }}>
+                                    {/* AI GROCERY BUTTON */}
+                                    <button 
+                                        onClick={() => { setShowGrocery(true); generateAiGroceryList(); }} 
+                                        style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', color: '#2563EB', flex: 2, display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', fontWeight:'bold' }}
+                                    >
                                         <ShoppingBag size={18} /> Grocery List
                                     </button>
 
@@ -247,32 +228,48 @@ export default function Clients() {
                 <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.5)', zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px'}}>
                     <div style={{background:'white', width:'100%', maxWidth:'500px', borderRadius:'16px', maxHeight:'80vh', display:'flex', flexDirection:'column'}}>
                         <div style={{padding:'20px', borderBottom:'1px solid #eee', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                            <h3 style={{margin:0}}>Shopping List</h3>
+                            <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                                <div style={{background:'#dbeafe', padding:'8px', borderRadius:'8px', color:'#2563EB'}}><ChefHat size={20}/></div>
+                                <div>
+                                    <h3 style={{margin:0, fontSize:'16px'}}>AI Chef List</h3>
+                                    <div style={{fontSize:'12px', color:'#64748b'}}>Powered by Gemini</div>
+                                </div>
+                            </div>
                             <button onClick={() => setShowGrocery(false)} style={{background:'none', border:'none', cursor:'pointer'}}><X size={24}/></button>
                         </div>
-                        <div style={{padding:'20px', overflowY:'auto'}}>
-                            <div style={{background:'#eff6ff', padding:'15px', borderRadius:'8px', marginBottom:'20px', color:'#1e40af', fontSize:'14px'}}>
-                                <strong>Calculated for:</strong> {selectedClient.service_data?.guest_count || 0} Guests<br/>
-                                <small>Includes estimates for selected entrees and sides.</small>
-                            </div>
+                        
+                        <div style={{padding:'20px', overflowY:'auto', flex:1}}>
                             
-                            {selectedClient.service_data?.guest_count ? (
+                            {/* STATUS MESSAGES */}
+                            {!selectedClient.service_data?.guest_count || selectedClient.service_data?.guest_count === '0' ? (
+                                <div style={{textAlign:'center', color:'#94a3b8', padding:'40px'}}>
+                                    Please set the <strong>Guest Count</strong> and <strong>Menu</strong> first.
+                                </div>
+                            ) : aiLoading ? (
+                                <div style={{textAlign:'center', padding:'40px'}}>
+                                    <Loader2 className="spin" size={32} style={{marginBottom:'15px', color:'#2563EB'}}/>
+                                    <div style={{fontWeight:'bold', color:'#334155'}}>Calculating Ingredients...</div>
+                                    <div style={{fontSize:'13px', color:'#64748b', marginTop:'5px'}}>Analyzing menu for {selectedClient.service_data?.guest_count} people</div>
+                                </div>
+                            ) : groceryList.length > 0 ? (
                                 <div style={{display:'grid', gap:'10px'}}>
-                                    {calculateGroceries().map((item, i) => (
-                                        <div key={i} style={{display:'flex', justifyContent:'space-between', padding:'10px', borderBottom:'1px dashed #e2e8f0'}}>
-                                            <span style={{fontWeight:'500', color:'#334155'}}>{item.name}</span>
-                                            <span style={{fontWeight:'bold', color:'#2563EB'}}>{item.qty} {item.unit}</span>
+                                    {groceryList.map((item, i) => (
+                                        <div key={i} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px', borderBottom:'1px dashed #e2e8f0'}}>
+                                            <span style={{fontWeight:'500', color:'#334155'}}>{item.item}</span>
+                                            <span style={{fontWeight:'bold', color:'#2563EB', background:'#eff6ff', padding:'4px 10px', borderRadius:'12px', fontSize:'13px'}}>{item.quantity}</span>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
                                 <div style={{textAlign:'center', color:'#94a3b8', padding:'40px'}}>
-                                    Please set the Guest Count in the "Event Details" tab first.
+                                    No ingredients found. Try adding more menu items.
                                 </div>
                             )}
+
                         </div>
+                        
                         <div style={{padding:'20px', borderTop:'1px solid #eee'}}>
-                            <button onClick={() => window.print()} style={{width:'100%', padding:'15px', background:'#0f172a', color:'white', border:'none', borderRadius:'10px', fontWeight:'bold'}}>Print List</button>
+                            <button onClick={() => window.print()} style={{width:'100%', padding:'15px', background:'#0f172a', color:'white', border:'none', borderRadius:'10px', fontWeight:'bold', cursor:'pointer'}}>Print Shopping List</button>
                         </div>
                     </div>
                 </div>
