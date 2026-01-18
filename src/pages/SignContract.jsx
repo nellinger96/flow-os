@@ -1,294 +1,164 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
-import { CheckCircle, PenTool, Calendar, MapPin, Clock, Users, ChevronRight, CreditCard, ShieldAlert, Utensils } from 'lucide-react'
-import confetti from 'canvas-confetti' 
+import { Loader2, CheckCircle, Calendar, Clock, MapPin, Users, FileText } from 'lucide-react'
 
 export default function SignContract() {
     const { id } = useParams()
     const [client, setClient] = useState(null)
     const [loading, setLoading] = useState(true)
-    const [signature, setSignature] = useState('')
     const [signed, setSigned] = useState(false)
-    const [error, setError] = useState(null)
-    const [agreedToTerms, setAgreedToTerms] = useState(false)
 
     useEffect(() => {
         fetchContract()
     }, [])
 
     async function fetchContract() {
-        const { data: clientData, error } = await supabase.from('customers').select('*').eq('id', id).single()
-        
-        if (error) {
-            setError("Proposal not found or has expired.")
-            setLoading(false)
-            return
+        const { data, error } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('id', id)
+            .single()
+
+        if (data) {
+            setClient(data)
+            if (data.status === 'booked') setSigned(true)
         }
-        
-        setClient(clientData)
-        if (clientData.contract_url === 'SIGNED_DIGITALLY') setSigned(true)
         setLoading(false)
     }
 
     async function handleSign() {
-        if (!agreedToTerms) return alert("Please read and accept the Terms & Conditions.")
-        if (!signature || signature.length < 3) return alert("Please type your full legal name to sign.")
-        
-        const timestamp = new Date().toISOString()
-        
+        if (!confirm("By clicking OK, you agree to the terms and authorize this contract.")) return
+
         const { error } = await supabase
             .from('customers')
-            .update({
-                status: 'sold', 
-                contract_url: 'SIGNED_DIGITALLY',
-                service_data: { 
-                    ...client.service_data, 
-                    signed_by: signature, 
-                    signed_at: timestamp,
-                    terms_accepted: true
-                }
-            })
+            .update({ status: 'booked' }) // Change status to Booked
             .eq('id', id)
 
-        if (error) {
-            alert("Error signing: " + error.message)
-        } else {
+        if (!error) {
             setSigned(true)
-            confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } })
+            alert("Contract Signed! We are ready to serve you.")
+        } else {
+            alert("Error signing: " + error.message)
         }
     }
 
-    if (loading) return <div style={{height:'100vh', display:'flex', alignItems:'center', justifyContent:'center', color:'#64748b'}}>Loading Proposal...</div>
-    if (error) return <div style={{padding:'40px', textAlign:'center', color:'#ef4444', fontWeight:'bold'}}>{error}</div>
-
-    // --- DATA EXTRACTION ---
-    const eventDate = client.service_data?.event_date 
-        ? new Date(client.service_data.event_date).toLocaleDateString('en-US', { timeZone: 'UTC', weekday:'long', year:'numeric', month:'long', day:'numeric' }) 
-        : 'Date TBD'
-        
-    const paymentPlan = client.service_data?.payment_plan || []
-
-    // FIX: Using the exact names found in your database
-    const entrees = client.service_data?.menu_entrees || []
-    const sides = client.service_data?.menu_sides || []
-    const drinks = client.service_data?.menu_drinks || []
-    const legacyMenu = client.service_data?.selected_menu_items || []
-    
-    const hasMenu = entrees.length > 0 || sides.length > 0 || drinks.length > 0 || legacyMenu.length > 0
-
-    // --- ALREADY SIGNED VIEW ---
-    if (signed) {
-        return (
-            <div style={{ maxWidth: '600px', margin: '60px auto', padding: '40px', textAlign: 'center', fontFamily: 'sans-serif', animation: 'fadeIn 0.5s' }}>
-                <div style={{ background: '#dcfce7', width: '100px', height: '100px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 30px auto', boxShadow:'0 10px 20px rgba(22, 163, 74, 0.2)' }}>
-                    <CheckCircle size={50} color="#16a34a" />
-                </div>
-                <h1 style={{ color: '#0f172a', fontSize:'32px', marginBottom:'10px' }}>You're All Set!</h1>
-                <p style={{ color: '#64748b', fontSize:'18px', lineHeight:'1.6' }}>
-                    Thank you, {client.full_name}.<br/>Your event is officially booked.
-                </p>
-                <div style={{ marginTop: '40px', padding: '25px', background: '#f8fafc', borderRadius: '16px', border:'1px solid #e2e8f0', textAlign:'left' }}>
-                    <div style={{fontSize:'12px', textTransform:'uppercase', color:'#94a3b8', fontWeight:'bold', marginBottom:'5px'}}>Digital Signature</div>
-                    <div style={{fontSize:'20px', fontWeight:'bold', fontFamily:'monospace', color:'#334155'}}>{client.service_data?.signed_by || signature}</div>
-                    <div style={{fontSize:'14px', color:'#64748b', marginTop:'5px'}}>{new Date(client.service_data?.signed_at || new Date()).toLocaleString()}</div>
-                </div>
-            </div>
-        )
+    // --- HELPER: CONVERT 24H TIME TO AM/PM ---
+    function formatTime(time24) {
+        if (!time24) return ''
+        let [hours, minutes] = time24.split(':').map(Number)
+        const ampm = hours >= 12 ? 'PM' : 'AM'
+        const h12 = hours % 12 || 12
+        return `${h12}:${minutes.toString().padStart(2, '0')} ${ampm}`
     }
 
-    // --- CONTRACT VIEW ---
+    // --- DISPLAY RANGE ---
+    function getServiceRange(start, end) {
+        if (!start) return 'Time TBD'
+        const startFormatted = formatTime(start)
+        const endFormatted = end ? formatTime(end) : '(End TBD)'
+        return `${startFormatted} - ${endFormatted}`
+    }
+
+    if (loading) return <div style={{display:'flex', justifyContent:'center', marginTop:'50px'}}><Loader2 className="spin" /></div>
+
+    if (!client) return <div style={{textAlign:'center', marginTop:'50px'}}>Contract not found.</div>
+
+    // Shortcuts for cleaner JSX
+    const s = client.service_data || {}
+
     return (
-        <div style={{ background: '#f8fafc', minHeight: '100vh', padding: '40px 20px', fontFamily: 'sans-serif' }}>
-            <div style={{ maxWidth: '800px', margin: '0 auto', background: 'white', borderRadius: '20px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', overflow: 'hidden' }}>
-                
-                {/* HERO HEADER */}
-                <div style={{ background: '#0f172a', padding: '40px', color: 'white', position: 'relative' }}>
-                    <div style={{ fontSize: '14px', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Service Proposal</div>
-                    <h1 style={{ margin: '10px 0', fontSize: '32px' }}>{client.full_name}</h1>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginTop: '20px', flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.1)', padding: '8px 15px', borderRadius: '20px', fontSize: '14px' }}>
-                            <Calendar size={16} /> {eventDate}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.1)', padding: '8px 15px', borderRadius: '20px', fontSize: '14px' }}>
-                            <Clock size={16} /> {client.service_data?.event_time || 'TBD'}
-                        </div>
-                    </div>
-                </div>
-
-                <div style={{ padding: '40px' }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 20px', fontFamily: 'sans-serif', color: '#1e293b' }}>
+            
+            {/* HEADER */}
+            <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                <h1 style={{ fontSize: '32px', fontWeight: '800', marginBottom: '10px' }}>{client.full_name}</h1>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', color: '#64748b' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Calendar size={18}/> {s.service_date || 'TBD'}</div>
                     
-                    {/* KEY DETAILS GRID */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '30px', marginBottom: '40px' }}>
-                        <div>
-                            <div style={{ color: '#64748b', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px' }}>Location</div>
-                            <div style={{ fontSize: '16px', fontWeight: '500', color: '#334155', display:'flex', gap:'8px' }}>
-                                <MapPin size={20} color="#2563EB"/> {client.address}
-                            </div>
-                        </div>
-                        <div>
-                            <div style={{ color: '#64748b', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px' }}>Guest Count</div>
-                            <div style={{ fontSize: '16px', fontWeight: '500', color: '#334155', display:'flex', gap:'8px' }}>
-                                <Users size={20} color="#2563EB"/> {client.service_data?.guest_count || 0} People
-                            </div>
-                        </div>
-                        <div>
-                            <div style={{ color: '#64748b', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px' }}>Total Investment</div>
-                            <div style={{ fontSize: '24px', fontWeight: '900', color: '#16a34a' }}>
-                                ${client.job_price?.toLocaleString()}
-                            </div>
-                        </div>
+                    {/* UPDATED TIME DISPLAY */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Clock size={18}/> 
+                        {getServiceRange(s.service_time, s.service_end_time)}
                     </div>
-
-                    {/* MENU & SERVICES */}
-                    <div style={{ marginBottom: '40px' }}>
-                        <h3 style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <Utensils size={20} /> Service Details
-                        </h3>
-                        
-                        {/* Dynamic Menu Display */}
-                        {hasMenu ? (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginTop: '20px' }}>
-                                
-                                {entrees.length > 0 && (
-                                    <div>
-                                        <div style={{fontSize:'12px', fontWeight:'bold', color:'#94a3b8', textTransform:'uppercase', marginBottom:'8px'}}>Entrees</div>
-                                        {entrees.map((item, i) => (
-                                            <div key={i} style={{marginBottom:'5px', fontWeight:'500', color:'#334155'}}>• {item}</div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {sides.length > 0 && (
-                                    <div>
-                                        <div style={{fontSize:'12px', fontWeight:'bold', color:'#94a3b8', textTransform:'uppercase', marginBottom:'8px'}}>Sides</div>
-                                        {sides.map((item, i) => (
-                                            <div key={i} style={{marginBottom:'5px', fontWeight:'500', color:'#334155'}}>• {item}</div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {drinks.length > 0 && (
-                                    <div>
-                                        <div style={{fontSize:'12px', fontWeight:'bold', color:'#94a3b8', textTransform:'uppercase', marginBottom:'8px'}}>Drinks</div>
-                                        {drinks.map((item, i) => (
-                                            <div key={i} style={{marginBottom:'5px', fontWeight:'500', color:'#334155'}}>• {item}</div>
-                                        ))}
-                                    </div>
-                                )}
-                                
-                                {legacyMenu.length > 0 && (
-                                    <div>
-                                        <div style={{fontSize:'12px', fontWeight:'bold', color:'#94a3b8', textTransform:'uppercase', marginBottom:'8px'}}>Included Items</div>
-                                        {legacyMenu.map((item, i) => (
-                                            <div key={i} style={{marginBottom:'5px', fontWeight:'500', color:'#334155'}}>• {item}</div>
-                                        ))}
-                                    </div>
-                                )}
-
-                            </div>
-                        ) : (
-                            <div style={{ margin: '15px 0', fontSize: '14px', color: '#94a3b8', fontStyle: 'italic' }}>
-                                No specific menu items listed (General Service).
-                            </div>
-                        )}
-
-                        <p style={{ marginTop: '25px', lineHeight: '1.6', color: '#475569', background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                            <strong>Notes: </strong>
-                            {client.job_notes || 'Standard services as discussed.'}
-                        </p>
-                    </div>
-
-                    {/* PAYMENT SCHEDULE */}
-                    {paymentPlan.length > 0 && (
-                        <div style={{ marginBottom: '40px' }}>
-                            <h3 style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <CreditCard size={20} /> Payment Schedule
-                            </h3>
-                            <div style={{ marginTop: '20px', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-                                {paymentPlan.map((pay, i) => (
-                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '15px 20px', borderBottom: i === paymentPlan.length -1 ? 'none' : '1px solid #f1f5f9', background: pay.paid ? '#f0fdf4' : 'white' }}>
-                                        <div style={{display:'flex', gap:'15px', alignItems:'center'}}>
-                                            <div style={{fontWeight:'bold', color: pay.paid ? '#16a34a' : '#94a3b8'}}>#{i+1}</div>
-                                            <div>
-                                                <div style={{fontWeight:'bold', color: '#334155'}}>${parseFloat(pay.amount).toLocaleString()}</div>
-                                                <div style={{fontSize:'12px', color:'#64748b'}}>Due: {pay.date || 'TBD'}</div>
-                                            </div>
-                                        </div>
-                                        <div style={{display:'flex', alignItems:'center'}}>
-                                            {pay.paid ? (
-                                                <span style={{background:'#dcfce7', color:'#16a34a', fontSize:'12px', fontWeight:'bold', padding:'4px 10px', borderRadius:'20px'}}>PAID</span>
-                                            ) : (
-                                                <span style={{background:'#f1f5f9', color:'#64748b', fontSize:'12px', fontWeight:'bold', padding:'4px 10px', borderRadius:'20px'}}>UNPAID</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* TERMS & CONDITIONS BOX */}
-                    <div style={{ marginBottom: '30px' }}>
-                        <h3 style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <ShieldAlert size={20} /> Terms & Conditions
-                        </h3>
-                        <div style={{ height: '150px', overflowY: 'scroll', background: '#f1f5f9', padding: '15px', borderRadius: '8px', fontSize: '12px', color: '#475569', border: '1px solid #e2e8f0', marginTop: '15px' }}>
-                            <p><strong>1. Deposit & Payments:</strong> A non-refundable deposit is required to secure the date. Full payment is due as per the schedule above. Late payments may result in service cancellation.</p>
-                            <p><strong>2. Cancellations:</strong> Cancellations made less than 30 days before the event are subject to a 50% fee. Cancellations made less than 7 days prior are non-refundable.</p>
-                            <p><strong>3. Guest Count:</strong> Final guest count must be confirmed 7 days prior to the event. This count will be used for final billing and food preparation.</p>
-                            <p><strong>4. Leftovers:</strong> Any leftover food is the responsibility of the client. We are not responsible for food safety once it has been handed over or left at the venue.</p>
-                            <p><strong>5. Liability:</strong> We are not liable for any damages to the venue or personal property unless directly caused by our staff's negligence.</p>
-                            <p><strong>6. Service Time:</strong> Service will be provided for the specific hours listed. Additional hours will incur an extra charge.</p>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
-                            <input 
-                                type="checkbox" 
-                                id="terms" 
-                                checked={agreedToTerms} 
-                                onChange={(e) => setAgreedToTerms(e.target.checked)}
-                                style={{ width: '18px', height: '18px', cursor: 'pointer' }} 
-                            />
-                            <label htmlFor="terms" style={{ fontSize: '14px', color: '#334155', cursor: 'pointer' }}>I have read and agree to the Terms & Conditions.</label>
-                        </div>
-                    </div>
-
-                    {/* SIGNATURE AREA */}
-                    <div style={{ background: '#f8fafc', padding: '30px', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
-                        <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '10px', color:'#0f172a' }}>
-                            <PenTool size={20} /> Acceptance
-                        </h3>
-                        
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '8px', color:'#475569' }}>Type Full Legal Name</label>
-                        <input 
-                            type="text" 
-                            placeholder="e.g. John A. Doe" 
-                            value={signature}
-                            onChange={e => setSignature(e.target.value)}
-                            style={{ width: '100%', padding: '15px', fontSize: '18px', borderRadius: '8px', border: '1px solid #94a3b8', fontFamily: 'monospace', marginBottom: '20px', boxSizing: 'border-box' }}
-                        />
-
-                        <button 
-                            onClick={handleSign}
-                            style={{ 
-                                width: '100%', padding: '18px', 
-                                background: agreedToTerms ? '#2563EB' : '#94a3b8', 
-                                color: 'white', 
-                                border: 'none', borderRadius: '10px', 
-                                fontSize: '18px', fontWeight: 'bold', 
-                                cursor: agreedToTerms ? 'pointer' : 'not-allowed',
-                                boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)',
-                                transition: 'all 0.2s',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
-                            }}
-                            disabled={!agreedToTerms}
-                        >
-                            Accept & Sign Contract <ChevronRight size={20} />
-                        </button>
-                    </div>
-
                 </div>
             </div>
+
+            {/* MAIN CARD */}
+            <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 4px 20px -5px rgba(0,0,0,0.1)', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                
+                {/* SUMMARY BAR */}
+                <div style={{ padding: '30px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', gap: '30px', justifyContent: 'space-between' }}>
+                    <div>
+                        <div style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '1px' }}>Location</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '5px', fontWeight: '500' }}>
+                            <MapPin size={16} color="#2563EB"/> {client.address}
+                        </div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '1px' }}>Guest Count</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '5px', fontWeight: '500' }}>
+                            <Users size={16} color="#2563EB"/> {s.guest_count || 0} People
+                        </div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '1px' }}>Total Investment</div>
+                        <div style={{ fontSize: '24px', fontWeight: '800', color: '#059669', marginTop: '2px' }}>${client.job_price}</div>
+                    </div>
+                </div>
+
+                {/* MENU & NOTES */}
+                <div style={{ padding: '30px' }}>
+                    <h3 style={{ fontSize: '18px', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}><FileText size={20}/> Service Details</h3>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+                        <div>
+                            <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#64748b', fontSize: '12px' }}>ENTREES</div>
+                            {s.menu_entrees?.map(item => <div key={item} style={{marginBottom:'4px'}}>• {item}</div>)}
+                        </div>
+                        <div>
+                            <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#64748b', fontSize: '12px' }}>SIDES</div>
+                            {s.menu_sides?.map(item => <div key={item} style={{marginBottom:'4px'}}>• {item}</div>)}
+                        </div>
+                        <div>
+                            <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#64748b', fontSize: '12px' }}>DRINKS</div>
+                            {s.menu_drinks?.map(item => <div key={item} style={{marginBottom:'4px'}}>• {item}</div>)}
+                        </div>
+                    </div>
+
+                    {/* NOTES SECTION */}
+                    <div style={{ background: '#fffbeb', padding: '20px', borderRadius: '12px', border: '1px solid #fcd34d' }}>
+                        <div style={{ fontWeight: 'bold', color: '#b45309', marginBottom: '5px', fontSize: '13px' }}>CUSTOMIZATIONS / NOTES</div>
+                        <div style={{ color: '#451a03', lineHeight: '1.6' }}>
+                            {s.notes || "No additional notes provided."}
+                        </div>
+                    </div>
+                </div>
+
+                {/* SIGNATURE AREA */}
+                <div style={{ padding: '30px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', textAlign: 'center' }}>
+                    {signed ? (
+                        <div style={{ padding: '20px', background: '#dcfce7', color: '#166534', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '10px', fontWeight: 'bold' }}>
+                            <CheckCircle size={24} /> Contract Signed & Confirmed
+                        </div>
+                    ) : (
+                        <div>
+                            <p style={{ marginBottom: '20px', color: '#64748b', fontSize: '14px' }}>
+                                By signing below, you agree to the service details and total price listed above.
+                            </p>
+                            <button 
+                                onClick={handleSign}
+                                style={{ background: '#2563EB', color: 'white', fontSize: '18px', fontWeight: 'bold', padding: '15px 40px', borderRadius: '50px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 15px rgba(37, 99, 235, 0.4)' }}
+                            >
+                                Sign & Accept Contract
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+            </div>
+
+            <style>{`.spin { animation: spin 1s linear infinite; } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
         </div>
     )
 }
