@@ -2,29 +2,17 @@ import { Calendar, Clock, Users, DollarSign, Trash2, Link as LinkIcon, ExternalL
 
 export default function CateringView({ formData, setFormData, clientId }) {
     
+    // SAFETY CHECK: Ensure service_data exists
     const s = formData.service_data || {}
+    
+    // CONTRACT URL
     const contractUrl = `${window.location.origin}/sign/${clientId}`
-    // Check 'booked' (lowercase) or 'Booked' (Capitalized) just in case
-    const isSigned = (formData.status || '').toLowerCase() === 'booked'
+    
+    // CHECK SIGNED STATUS (Case insensitive)
+    const status = (formData.status || '').toLowerCase()
+    const isSigned = status === 'booked'
 
-    // --- HELPER 1: DATA RECOVERY ---
-    // Finds data even if the variable name changed (Supports old & new layout)
-    function getValue(key1, key2) {
-        return s[key1] || s[key2] || ''
-    }
-
-    // --- HELPER 2: DATE FIXER ---
-    // Fixes "01/19/2026" -> "2026-01-19" so the calendar input reads it
-    function safeDate(val) {
-        if (!val) return ''
-        if (val.includes('/')) {
-            const parts = val.split('/')
-            if (parts.length === 3) return `${parts[2]}-${parts[0]}-${parts[1]}`
-        }
-        return val
-    }
-
-    // Helper to save data
+    // --- HELPER: SAVE DATA ---
     function updateServiceData(field, value) {
         setFormData({
             ...formData,
@@ -35,7 +23,7 @@ export default function CateringView({ formData, setFormData, clientId }) {
         })
     }
 
-    // Helper for Menu Items
+    // --- HELPER: MENU TOGGLE ---
     function toggleMenuItem(category, item) {
         const currentList = s[category] || []
         const newList = currentList.includes(item)
@@ -44,40 +32,54 @@ export default function CateringView({ formData, setFormData, clientId }) {
         updateServiceData(category, newList)
     }
 
-    // --- NEW: TOGGLE PAYMENT STATUS ---
-    function togglePaymentStatus(field, currentVal) {
-        // If it's 'paid', switch to 'unpaid', otherwise make it 'paid'
-        const newVal = (currentVal || '').toLowerCase() === 'paid' ? 'unpaid' : 'paid'
+    // --- HELPER: PAID/UNPAID TOGGLE (Using OLD keys) ---
+    function togglePaid(field) {
+        const current = s[field] || 'unpaid'
+        const newVal = current === 'paid' ? 'unpaid' : 'paid'
         updateServiceData(field, newVal)
     }
 
-    // Get current statuses (checking old and new keys)
-    const depositStatus = (getValue('deposit_status', 'payment_1_status') || 'unpaid').toLowerCase()
-    const finalStatus = (getValue('final_payment_status', 'payment_2_status') || 'unpaid').toLowerCase()
+    // --- HELPER: DATE FORMATTER ---
+    // Fixes "01/19/2026" (Old) -> "2026-01-19" (New)
+    function safeDate(val) {
+        if (!val) return ''
+        if (val.includes('/')) {
+            const parts = val.split('/') // Assumes MM/DD/YYYY
+            if (parts.length === 3) return `${parts[2]}-${parts[0]}-${parts[1]}`
+        }
+        return val
+    }
+
+    // --- DATA RECOVERY: PRIORITIZE OLD KEYS ---
+    // This forces the app to look for your EXISTING data first
+    const eventDate = safeDate(s.event_date || s.service_date)
+    const startTime = s.start_time || s.service_time
+    const endTime = s.end_time || s.service_end_time
+    
+    const pay1_date = safeDate(s.payment_1_date || s.deposit_date)
+    const pay1_amount = s.payment_1_amount || s.deposit_amount
+    const pay1_status = s.payment_1_status || s.deposit_status || 'unpaid'
+    
+    const pay2_date = safeDate(s.payment_2_date || s.final_payment_date)
+    const pay2_amount = s.payment_2_amount || s.final_payment_amount
+    const pay2_status = s.payment_2_status || s.final_payment_status || 'unpaid'
 
     return (
         <div style={{ display: 'grid', gap: '20px' }}>
             
-            {/* STATUS & CONTRACT HEADER */}
+            {/* 1. STATUS BAR */}
             <div style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'15px' }}>
                 <div>
-                    <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginBottom: '5px', textTransform: 'uppercase' }}>Current Status</div>
+                    <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginBottom: '5px', textTransform: 'uppercase' }}>Tracking Status</div>
                     <div style={{ display: 'flex', gap: '5px', background: '#f1f5f9', padding: '5px', borderRadius: '8px' }}>
                         {['lead', 'tasting', 'proposal', 'booked'].map(step => (
                             <button 
                                 key={step}
                                 onClick={() => setFormData({ ...formData, status: step })}
                                 style={{ 
-                                    padding: '6px 12px', 
-                                    borderRadius: '6px', 
-                                    border: 'none', 
-                                    cursor: 'pointer', 
-                                    fontSize: '12px', 
-                                    fontWeight: 'bold', 
-                                    textTransform: 'capitalize', 
-                                    background: (formData.status || '').toLowerCase() === step ? (step === 'booked' ? '#16a34a' : '#2563EB') : 'transparent', 
-                                    color: (formData.status || '').toLowerCase() === step ? 'white' : '#64748b', 
-                                    transition: '0.2s'
+                                    padding: '6px 12px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', textTransform: 'capitalize', 
+                                    background: status === step ? (step === 'booked' ? '#16a34a' : '#2563EB') : 'transparent', 
+                                    color: status === step ? 'white' : '#64748b'
                                 }}
                             >
                                 {step}
@@ -87,47 +89,32 @@ export default function CateringView({ formData, setFormData, clientId }) {
                 </div>
 
                 {isSigned && (
-                    <div style={{ padding:'10px 15px', background:'#dcfce7', color:'#166534', borderRadius:'8px', display:'flex', alignItems:'center', gap:'8px', fontWeight:'bold', fontSize:'14px' }}>
-                        <CheckCircle size={18} /> Contract Signed
+                    <div style={{ padding:'8px 12px', background:'#dcfce7', color:'#166534', borderRadius:'8px', display:'flex', alignItems:'center', gap:'8px', fontWeight:'bold', fontSize:'13px' }}>
+                        <CheckCircle size={16} /> Contract Signed
                     </div>
                 )}
             </div>
 
-            {/* EVENT DETAILS */}
+            {/* 2. EVENT DETAILS (Restored) */}
             <div style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px' }}>
                     
                     {/* Date */}
                     <div>
                         <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b' }}>Event Date</label>
-                        <input 
-                            type="date" 
-                            value={safeDate(getValue('service_date', 'event_date'))} 
-                            onChange={e => updateServiceData('service_date', e.target.value)} 
-                            style={{ width: '100%', padding: '10px', marginTop: '5px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }} 
-                        />
+                        <input type="date" value={eventDate} onChange={e => updateServiceData('event_date', e.target.value)} style={{ width: '100%', padding: '10px', marginTop: '5px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }} />
                     </div>
 
                     {/* Start Time */}
                     <div>
                         <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b' }}>Start Time</label>
-                        <input 
-                            type="time" 
-                            value={getValue('service_time', 'start_time')} 
-                            onChange={e => updateServiceData('service_time', e.target.value)} 
-                            style={{ width: '100%', padding: '10px', marginTop: '5px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }} 
-                        />
+                        <input type="time" value={startTime} onChange={e => updateServiceData('start_time', e.target.value)} style={{ width: '100%', padding: '10px', marginTop: '5px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }} />
                     </div>
 
-                    {/* End Time */}
+                    {/* End Time (Optional) */}
                     <div>
                         <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b' }}>End Time</label>
-                        <input 
-                            type="time" 
-                            value={getValue('service_end_time', 'end_time')} 
-                            onChange={e => updateServiceData('service_end_time', e.target.value)} 
-                            style={{ width: '100%', padding: '10px', marginTop: '5px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }} 
-                        />
+                        <input type="time" value={endTime} onChange={e => updateServiceData('end_time', e.target.value)} style={{ width: '100%', padding: '10px', marginTop: '5px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }} />
                     </div>
 
                     {/* Guest Count */}
@@ -137,20 +124,14 @@ export default function CateringView({ formData, setFormData, clientId }) {
                     </div>
                 </div>
 
-                {/* Price Calculator */}
+                {/* Calculator */}
                 <div style={{ marginTop: '20px', padding: '15px', background: '#f8fafc', borderRadius: '10px', display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
                     <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b' }}>Price Per Person ($)</label>
+                        <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b' }}>Price Per Head ($)</label>
                         <input type="number" value={s.price_per_head || ''} onChange={e => updateServiceData('price_per_head', e.target.value)} style={{ width: '100%', padding: '8px', marginTop: '5px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
                     </div>
-                    <div style={{ paddingBottom: '10px', color: '#94a3b8' }}>x</div>
-                    <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b' }}>Guest Count</label>
-                        <input value={s.guest_count || 0} disabled style={{ width: '100%', padding: '8px', marginTop: '5px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#f1f5f9' }} />
-                    </div>
-                    <div style={{ paddingBottom: '10px', color: '#94a3b8' }}>=</div>
                     <div style={{ flex: 1.5 }}>
-                        <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#2563EB' }}>Calculated Total</label>
+                        <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#2563EB' }}>Total</label>
                         <div style={{ width: '100%', padding: '8px', marginTop: '5px', borderRadius: '6px', border: '1px solid #2563EB', color: '#2563EB', fontWeight: 'bold', background: 'white' }}>
                             ${(parseFloat(s.price_per_head || 0) * parseFloat(s.guest_count || 0)).toLocaleString()}
                         </div>
@@ -158,86 +139,54 @@ export default function CateringView({ formData, setFormData, clientId }) {
                 </div>
             </div>
 
-            {/* FINANCIALS (WITH PAID/UNPAID TOGGLES RESTORED) */}
+            {/* 3. PAYMENT SCHEDULE (Restored Paid/Unpaid Buttons) */}
             <div style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                 <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#334155' }}>Payment Schedule</h3>
                 
                 {/* Payment 1 */}
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
                     <span style={{ fontSize: '12px', color: '#94a3b8', width: '60px' }}>#1 Deposit</span>
-                    <input 
-                        type="date" 
-                        value={safeDate(getValue('deposit_date', 'payment_1_date'))} 
-                        onChange={e => updateServiceData('deposit_date', e.target.value)} 
-                        style={{ padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px' }} 
-                    />
+                    <input type="date" value={pay1_date} onChange={e => updateServiceData('payment_1_date', e.target.value)} style={{ padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px' }} />
                     <div style={{ position: 'relative', flex: 1 }}>
                         <DollarSign size={14} style={{ position: 'absolute', left: '8px', top: '10px', color: '#94a3b8' }} />
-                        <input 
-                            placeholder="Amount" 
-                            value={getValue('deposit_amount', 'payment_1_amount')} 
-                            onChange={e => updateServiceData('deposit_amount', e.target.value)} 
-                            style={{ width: '100%', padding: '8px 8px 8px 25px', border: '1px solid #e2e8f0', borderRadius: '6px', boxSizing: 'border-box' }} 
-                        />
+                        <input placeholder="Amount" value={pay1_amount} onChange={e => updateServiceData('payment_1_amount', e.target.value)} style={{ width: '100%', padding: '8px 8px 8px 25px', border: '1px solid #e2e8f0', borderRadius: '6px', boxSizing: 'border-box' }} />
                     </div>
                     <button 
-                        onClick={() => togglePaymentStatus('deposit_status', depositStatus)}
+                        onClick={() => togglePaid('payment_1_status')}
                         style={{ 
-                            padding: '8px 12px', 
-                            borderRadius: '6px', 
-                            border: '1px solid',
-                            borderColor: depositStatus === 'paid' ? '#bbf7d0' : '#e2e8f0',
-                            background: depositStatus === 'paid' ? '#dcfce7' : '#f8fafc', 
-                            color: depositStatus === 'paid' ? '#166534' : '#64748b',
-                            fontSize: '12px',
-                            fontWeight: 'bold',
-                            cursor: 'pointer',
-                            minWidth: '70px'
+                            padding: '8px 12px', borderRadius: '6px', border: '1px solid', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', minWidth:'70px',
+                            borderColor: pay1_status === 'paid' ? '#bbf7d0' : '#e2e8f0',
+                            background: pay1_status === 'paid' ? '#dcfce7' : '#f8fafc', 
+                            color: pay1_status === 'paid' ? '#166534' : '#64748b'
                         }}
                     >
-                        {depositStatus === 'paid' ? 'PAID' : 'UNPAID'}
+                        {pay1_status === 'paid' ? 'PAID' : 'UNPAID'}
                     </button>
                 </div>
 
                 {/* Payment 2 */}
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <span style={{ fontSize: '12px', color: '#94a3b8', width: '60px' }}>#2 Final</span>
-                    <input 
-                        type="date" 
-                        value={safeDate(getValue('final_payment_date', 'payment_2_date'))} 
-                        onChange={e => updateServiceData('final_payment_date', e.target.value)} 
-                        style={{ padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px' }} 
-                    />
+                    <input type="date" value={pay2_date} onChange={e => updateServiceData('payment_2_date', e.target.value)} style={{ padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px' }} />
                     <div style={{ position: 'relative', flex: 1 }}>
                         <DollarSign size={14} style={{ position: 'absolute', left: '8px', top: '10px', color: '#94a3b8' }} />
-                        <input 
-                            placeholder="Amount" 
-                            value={getValue('final_payment_amount', 'payment_2_amount')} 
-                            onChange={e => updateServiceData('final_payment_amount', e.target.value)} 
-                            style={{ width: '100%', padding: '8px 8px 8px 25px', border: '1px solid #e2e8f0', borderRadius: '6px', boxSizing: 'border-box' }} 
-                        />
+                        <input placeholder="Amount" value={pay2_amount} onChange={e => updateServiceData('payment_2_amount', e.target.value)} style={{ width: '100%', padding: '8px 8px 8px 25px', border: '1px solid #e2e8f0', borderRadius: '6px', boxSizing: 'border-box' }} />
                     </div>
                     <button 
-                        onClick={() => togglePaymentStatus('final_payment_status', finalStatus)}
+                        onClick={() => togglePaid('payment_2_status')}
                         style={{ 
-                            padding: '8px 12px', 
-                            borderRadius: '6px', 
-                            border: '1px solid',
-                            borderColor: finalStatus === 'paid' ? '#bbf7d0' : '#e2e8f0',
-                            background: finalStatus === 'paid' ? '#dcfce7' : '#f8fafc', 
-                            color: finalStatus === 'paid' ? '#166534' : '#64748b',
-                            fontSize: '12px',
-                            fontWeight: 'bold',
-                            cursor: 'pointer',
-                            minWidth: '70px'
+                            padding: '8px 12px', borderRadius: '6px', border: '1px solid', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', minWidth:'70px',
+                            borderColor: pay2_status === 'paid' ? '#bbf7d0' : '#e2e8f0',
+                            background: pay2_status === 'paid' ? '#dcfce7' : '#f8fafc', 
+                            color: pay2_status === 'paid' ? '#166534' : '#64748b'
                         }}
                     >
-                        {finalStatus === 'paid' ? 'PAID' : 'UNPAID'}
+                        {pay2_status === 'paid' ? 'PAID' : 'UNPAID'}
                     </button>
                 </div>
             </div>
 
-            {/* MENUS */}
+            {/* 4. MENUS */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
                 {['Entrees', 'Sides', 'Drinks'].map(cat => {
                     const key = `menu_${cat.toLowerCase()}`
@@ -267,7 +216,7 @@ export default function CateringView({ formData, setFormData, clientId }) {
                 })}
             </div>
 
-            {/* NOTES */}
+            {/* 5. NOTES */}
             <div style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                 <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginBottom: '10px', textTransform: 'uppercase' }}>Customizations / Notes</div>
                 <textarea 
@@ -278,12 +227,11 @@ export default function CateringView({ formData, setFormData, clientId }) {
                 />
             </div>
 
-            {/* CONTRACT & LINKS */}
+            {/* 6. CONTRACT ACTIONS */}
             <div style={{ background: '#f0f9ff', padding: '20px', borderRadius: '12px', border: '1px solid #bae6fd' }}>
                 <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#0369a1', display:'flex', alignItems:'center', gap:'8px' }}>
                     <FileText size={18} /> Contract & Files
                 </h3>
-                
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <button 
                         onClick={() => {navigator.clipboard.writeText(contractUrl); alert("Copied!")}}
@@ -299,16 +247,6 @@ export default function CateringView({ formData, setFormData, clientId }) {
                         <ExternalLink size={16} /> Open Contract
                     </button>
                 </div>
-                
-                {isSigned ? (
-                     <div style={{ marginTop:'15px', fontSize:'13px', color:'#15803d' }}>
-                        ✓ Contract is marked as <strong>Signed (Booked)</strong>.
-                     </div>
-                ) : (
-                    <div style={{ marginTop:'15px', fontSize:'13px', color:'#64748b' }}>
-                        ⚠ Contract is waiting for signature.
-                    </div>
-                )}
             </div>
 
         </div>
