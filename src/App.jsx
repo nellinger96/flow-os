@@ -55,14 +55,12 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   useEffect(() => {
-    // 1. Check active session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       if (session?.user?.user_metadata?.business_type) setBusinessType(session.user.user_metadata.business_type)
       setLoading(false)
     })
 
-    // 2. Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       if (session?.user?.user_metadata?.business_type) setBusinessType(session.user.user_metadata.business_type)
@@ -80,14 +78,11 @@ function App() {
   if (loading) return null
 
   // --- PUBLIC / LOGIN FLOW ---
-  // If no session, only show Login, Update Password, OR Public Contract Page
   if (!session) {
     return (
         <Router>
             <Routes>
-                {/* PUBLIC ROUTE: Clients can access this without login */}
                 <Route path="/sign/:id" element={<SignContract />} />
-                
                 <Route path="/update-password" element={<UpdatePassword />} />
                 <Route path="*" element={<Login />} />
             </Routes>
@@ -98,7 +93,6 @@ function App() {
   // --- SECURE APP FLOW (Logged In) ---
   return (
     <Router>
-        {/* NAVIGATION COMPONENTS */}
         <Sidebar 
             isOpen={isSidebarOpen} 
             onClose={() => setIsSidebarOpen(false)} 
@@ -107,15 +101,17 @@ function App() {
         />
         <TopBar onOpenMenu={() => setIsSidebarOpen(true)} />
 
-        {/* MAIN CONTENT AREA */}
         <div style={{ 
             height: '100vh', 
-            overflowY: 'auto', // Allows scrolling
-            paddingTop: '60px', // Push content down below TopBar
+            overflowY: 'auto', 
+            paddingTop: '60px', 
             backgroundColor: '#f8fafc'
         }}>
             <Routes>
+                {/* FIX: Added explicit /dashboard route */}
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                
                 <Route path="/calendar" element={<Calendar />} />
                 <Route path="/map" element={<Tracker />} />
                 <Route path="/analytics" element={<Analytics />} />

@@ -12,13 +12,11 @@ export default function Login() {
     const navigate = useNavigate()
 
     useEffect(() => {
-        // Redirect if already logged in
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session) navigate('/dashboard')
         })
     }, [navigate])
 
-    // --- PASSWORD STRENGTH LOGIC ---
     useEffect(() => {
         if (!password) { setStrength(0); return }
         let score = 0
@@ -31,9 +29,9 @@ export default function Login() {
     }, [password])
 
     const getStrengthColor = () => {
-        if (strength <= 2) return '#ef4444' // Red
-        if (strength <= 3) return '#eab308' // Yellow
-        return '#22c55e' // Green
+        if (strength <= 2) return '#ef4444'
+        if (strength <= 3) return '#eab308'
+        return '#22c55e'
     }
 
     const getStrengthLabel = () => {
@@ -42,19 +40,15 @@ export default function Login() {
         return 'Strong'
     }
 
-    // --- AUTH HANDLERS ---
     async function handleAuth(e) {
         e.preventDefault()
         setLoading(true)
-        
         try {
             if (isSignUp) {
                 const { error } = await supabase.auth.signUp({ 
                     email, 
                     password,
-                    options: {
-                        data: { business_name: 'My Catering Co.' } 
-                    }
+                    options: { data: { business_name: 'My Catering Co.' } }
                 })
                 if (error) throw error
                 alert("Success! Check your email for the confirmation link.")
@@ -73,18 +67,16 @@ export default function Login() {
     async function handleGoogleLogin() {
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
-            options: {
-                redirectTo: `${window.location.origin}/dashboard`
-            }
+            options: { redirectTo: `${window.location.origin}/dashboard` }
         })
         if (error) alert(error.message)
     }
 
     return (
-        <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'sans-serif', background: 'white' }}>
+        <div className="login-container">
             
             {/* LEFT: FORM SECTION */}
-            <div style={{ flex: '1', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '40px 60px', maxWidth: '500px' }}>
+            <div className="form-section">
                 <div style={{ marginBottom: '40px' }}>
                     <div style={{ background: '#0f172a', color: 'white', width: '40px', height: '40px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', marginBottom: '20px', fontSize:'18px' }}>CF</div>
                     <h1 style={{ fontSize: '32px', margin: '0 0 10px 0', color: '#1e293b', fontWeight:'800' }}>{isSignUp ? 'Create Account' : 'Welcome back.'}</h1>
@@ -94,26 +86,17 @@ export default function Login() {
                 </div>
 
                 <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    
-                    {/* EMAIL INPUT */}
                     <div>
                         <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#475569', marginBottom: '8px' }}>Email Address</label>
                         <div style={{ position: 'relative' }}>
                             <Mail size={18} color="#94a3b8" style={{ position: 'absolute', left: '15px', top: '14px' }} />
                             <input 
-                                type="email" 
-                                required
-                                value={email}
-                                onChange={e => setEmail(e.target.value)}
-                                placeholder="chef@example.com"
-                                style={{ width: '100%', padding: '12px 12px 12px 45px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none', boxSizing:'border-box', transition:'border 0.2s' }}
-                                onFocus={(e) => e.target.style.borderColor = '#2563EB'}
-                                onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
+                                type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="chef@example.com"
+                                style={{ width: '100%', padding: '12px 12px 12px 45px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none', boxSizing:'border-box' }}
                             />
                         </div>
                     </div>
 
-                    {/* PASSWORD INPUT */}
                     <div>
                         <div style={{ display:'flex', justifyContent:'space-between' }}>
                             <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#475569', marginBottom: '8px' }}>Password</label>
@@ -122,42 +105,25 @@ export default function Login() {
                         <div style={{ position: 'relative' }}>
                             <Lock size={18} color="#94a3b8" style={{ position: 'absolute', left: '15px', top: '14px' }} />
                             <input 
-                                type="password" 
-                                required
-                                value={password}
-                                onChange={e => setPassword(e.target.value)}
-                                placeholder="••••••••"
-                                style={{ width: '100%', padding: '12px 12px 12px 45px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none', boxSizing:'border-box', transition:'border 0.2s' }}
-                                onFocus={(e) => e.target.style.borderColor = '#2563EB'}
-                                onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
+                                type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••"
+                                style={{ width: '100%', padding: '12px 12px 12px 45px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none', boxSizing:'border-box' }}
                             />
                         </div>
-                        
-                        {/* STRENGTH METER (Only visible on Sign Up) */}
                         {isSignUp && password.length > 0 && (
                             <div style={{ marginTop: '12px', background:'#f8fafc', padding:'10px', borderRadius:'8px', border:'1px solid #f1f5f9' }}>
                                 <div style={{ display: 'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'5px', fontWeight:'bold', color: getStrengthColor() }}>
-                                    <span>Password Strength</span>
-                                    <span>{getStrengthLabel()}</span>
+                                    <span>Strength</span><span>{getStrengthLabel()}</span>
                                 </div>
                                 <div style={{ display: 'flex', height: '4px', gap: '5px' }}>
                                     {[1, 2, 3, 4, 5].map(i => (
                                         <div key={i} style={{ flex: 1, borderRadius: '2px', background: strength >= i ? getStrengthColor() : '#e2e8f0', transition: '0.3s' }}></div>
                                     ))}
                                 </div>
-                                <ul style={{ margin:'10px 0 0 15px', padding:0, fontSize:'11px', color:'#64748b' }}>
-                                    <li>Use 8+ characters</li>
-                                    <li>Mix letters & numbers</li>
-                                </ul>
                             </div>
                         )}
                     </div>
 
-                    <button 
-                        type="submit" 
-                        disabled={loading}
-                        style={{ background: '#0f172a', color: 'white', border: 'none', padding: '14px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '10px', transition:'0.2s' }}
-                    >
+                    <button type="submit" disabled={loading} style={{ background: '#0f172a', color: 'white', border: 'none', padding: '14px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '10px' }}>
                         {loading ? <Loader2 className="spin" size={20}/> : (isSignUp ? 'Create Account' : 'Sign In')}
                     </button>
                 </form>
@@ -168,48 +134,27 @@ export default function Login() {
                     <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
                 </div>
 
-                {/* GOOGLE BUTTON */}
-                <button 
-                    onClick={handleGoogleLogin}
-                    style={{ background: 'white', border: '1px solid #cbd5e1', color: '#475569', padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', transition: '0.2s' }}
-                    onMouseOver={(e) => e.target.style.background = '#f8fafc'}
-                    onMouseOut={(e) => e.target.style.background = 'white'}
-                >
-                    <Chrome size={18} color="#EA4335" />
-                    Google
+                <button onClick={handleGoogleLogin} style={{ background: 'white', border: '1px solid #cbd5e1', color: '#475569', padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                    <Chrome size={18} color="#EA4335" /> Google
                 </button>
 
                 <div style={{ textAlign: 'center', marginTop: '30px', fontSize: '14px', color: '#64748b' }}>
                     {isSignUp ? "Already have an account?" : "Don't have an account?"}
-                    <button 
-                        onClick={() => { setIsSignUp(!isSignUp); setPassword(''); }} 
-                        style={{ background: 'none', border: 'none', color: '#2563EB', fontWeight: 'bold', cursor: 'pointer', marginLeft: '5px' }}
-                    >
+                    <button onClick={() => { setIsSignUp(!isSignUp); setPassword(''); }} style={{ background: 'none', border: 'none', color: '#2563EB', fontWeight: 'bold', cursor: 'pointer', marginLeft: '5px' }}>
                         {isSignUp ? 'Sign In' : 'Create one'}
                     </button>
                 </div>
             </div>
 
-            {/* RIGHT: IMAGE SECTION */}
-            <div style={{ flex: '1.2', background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', position: 'relative', overflow: 'hidden' }}>
+            {/* RIGHT: IMAGE SECTION (Hidden on Mobile) */}
+            <div className="image-section">
                 <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'radial-gradient(circle at 30% 30%, #1e293b 0%, #0f172a 100%)' }}></div>
-                
-                {/* DECORATIVE CIRCLES */}
-                <div style={{ position:'absolute', top:'-10%', right:'-10%', width:'500px', height:'500px', borderRadius:'50%', border:'1px solid rgba(255,255,255,0.05)' }}></div>
-                <div style={{ position:'absolute', bottom:'-10%', left:'-10%', width:'600px', height:'600px', borderRadius:'50%', border:'1px solid rgba(255,255,255,0.03)' }}></div>
-
                 <div style={{ position: 'relative', zIndex: 10, maxWidth: '400px', padding: '40px' }}>
-                    <div style={{ display:'flex', gap:'10px', marginBottom:'20px' }}>
-                        <div style={{width:'12px', height:'12px', borderRadius:'50%', background:'#ef4444'}}></div>
-                        <div style={{width:'12px', height:'12px', borderRadius:'50%', background:'#f59e0b'}}></div>
-                        <div style={{width:'12px', height:'12px', borderRadius:'50%', background:'#22c55e'}}></div>
-                    </div>
                     <h2 style={{ fontSize: '48px', fontWeight: '800', lineHeight: '1.1', marginBottom: '20px', letterSpacing:'-1px' }}>
-                        Scale your <br/>
-                        <span style={{color:'#60a5fa'}}>Catering Business</span>
+                        Scale your <br/> <span style={{color:'#60a5fa'}}>Catering Business</span>
                     </h2>
                     <p style={{ fontSize: '18px', opacity: 0.7, lineHeight: '1.6', fontWeight:'300' }}>
-                        Manage menus, track payments, and streamline your kitchen operations with the OS built for caterers.
+                        Manage menus, track payments, and streamline your kitchen operations.
                     </p>
                     <div style={{ marginTop:'40px', display:'flex', alignItems:'center', gap:'15px', fontSize:'13px', opacity:0.8 }}>
                         <CheckCircle size={16} color="#22c55e" /> Free 14-day trial
@@ -218,7 +163,44 @@ export default function Login() {
                 </div>
             </div>
 
-            <style>{`.spin { animation: spin 1s linear infinite; } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+            {/* RESPONSIVE CSS STYLES */}
+            <style>{`
+                .login-container {
+                    display: flex;
+                    min-height: 100vh;
+                    font-family: sans-serif;
+                    background: white;
+                }
+                .form-section {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    padding: 40px 60px;
+                    max-width: 500px;
+                }
+                .image-section {
+                    flex: 1.2;
+                    background: #0f172a;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    position: relative;
+                    overflow: hidden;
+                }
+                .spin { animation: spin 1s linear infinite; }
+                @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+                /* MOBILE RULES */
+                @media (max-width: 900px) {
+                    .image-section { display: none; } /* Hide image on tablet/mobile */
+                    .form-section { 
+                        max-width: 100%; 
+                        padding: 20px; 
+                    }
+                }
+            `}</style>
         </div>
     )
 }
