@@ -1,76 +1,48 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../supabaseClient' 
-import { Printer, Users, Clock, Calendar, AlertTriangle, Plus, Trash2, FileText, Check, Link, Upload, Eye, X, DollarSign, CreditCard, ChevronDown } from 'lucide-react'
+import { Printer, Plus, Trash2, Check, Link, Upload, Eye, X, DollarSign, ChevronDown } from 'lucide-react'
 
 export default function CateringView({ formData, setFormData, clientId }) {
     const [uploading, setUploading] = useState(false)
-    
-    // Distinct Menu Lists
     const [entreeOptions, setEntreeOptions] = useState([])
     const [sideOptions, setSideOptions] = useState([])
     const [drinkOptions, setDrinkOptions] = useState([])
-    
     const [businessProfile, setBusinessProfile] = useState(null)
 
-    // --- FIX: LOCAL BUFFERS (Prevents the "Reverting Number" Bug) ---
-    // These hold the value temporarily while you type
     const [localPrice, setLocalPrice] = useState(formData.service_data?.price_per_head || '')
     const [localGuests, setLocalGuests] = useState(formData.service_data?.guest_count || '')
 
-    // Sync the buffers if you switch to a different client
     useEffect(() => {
         setLocalPrice(formData.service_data?.price_per_head || '')
         setLocalGuests(formData.service_data?.guest_count || '')
     }, [formData.service_data?.price_per_head, formData.service_data?.guest_count])
 
-    // --- 1. FETCH & FILTER DATA ---
     useEffect(() => {
         const fetchData = async () => {
-            // Get Services with Categories
             const { data: services } = await supabase.from('services').select('name, category').order('name', { ascending: true })
-            
             if (services) {
-                // Filter into specific buckets
-                setEntreeOptions(services.filter(s => s.category === 'Entree' || !s.category)) // Default to Entree if missing
+                setEntreeOptions(services.filter(s => s.category === 'Entree' || !s.category))
                 setSideOptions(services.filter(s => s.category === 'Side'))
                 setDrinkOptions(services.filter(s => s.category === 'Drink'))
             }
-
-            // Get User Profile for Invoice Header
             const { data: { user } } = await supabase.auth.getUser()
-            if (user?.user_metadata) {
-                setBusinessProfile(user.user_metadata)
-            }
+            if (user?.user_metadata) setBusinessProfile(user.user_metadata)
         }
         fetchData()
     }, [])
 
-    // --- HELPER TO UPDATE NESTED DATA ---
     const updateService = (field, value) => {
         const newServiceData = { ...formData.service_data, [field]: value }
-        
-        // AUTO-CALCULATOR LOGIC
         let newJobPrice = formData.job_price
         if (field === 'guest_count' || field === 'price_per_head') {
             const guests = parseFloat(field === 'guest_count' ? value : newServiceData.guest_count) || 0
             const price = parseFloat(field === 'price_per_head' ? value : newServiceData.price_per_head) || 0
-            
-            // Only auto-calculate if both numbers exist
-            if (guests > 0 && price > 0) {
-                newJobPrice = guests * price
-            }
+            if (guests > 0 && price > 0) newJobPrice = guests * price
         }
-
-        setFormData(prev => ({
-            ...prev,
-            job_price: newJobPrice,
-            service_data: newServiceData
-        }))
+        setFormData(prev => ({ ...prev, job_price: newJobPrice, service_data: newServiceData }))
     }
 
-    // --- PAYMENT PLAN LOGIC ---
     const paymentPlan = formData.service_data?.payment_plan || [] 
-
     const handleInstallmentChange = (count) => {
         const newCount = parseInt(count)
         let newPlan = [...paymentPlan]
@@ -93,7 +65,6 @@ export default function CateringView({ formData, setFormData, clientId }) {
     const percentPaid = totalJobPrice > 0 ? Math.min(100, Math.round((totalCollected / totalJobPrice) * 100)) : 0
     const balanceDue = totalJobPrice - totalCollected
 
-    // --- MENU CATEGORY LOGIC ---
     const entrees = formData.service_data?.menu_entrees || []
     const sides = formData.service_data?.menu_sides || []
     const drinks = formData.service_data?.menu_drinks || []
@@ -101,9 +72,7 @@ export default function CateringView({ formData, setFormData, clientId }) {
     const addItemToCategory = (category, itemName) => {
         if (!itemName) return
         const currentList = formData.service_data?.[category] || []
-        if (!currentList.includes(itemName)) {
-            updateService(category, [...currentList, itemName])
-        }
+        if (!currentList.includes(itemName)) updateService(category, [...currentList, itemName])
     }
 
     const removeItemFromCategory = (category, itemName) => {
@@ -112,7 +81,6 @@ export default function CateringView({ formData, setFormData, clientId }) {
         updateService(category, newList)
     }
 
-    // --- PIPELINE & FILES ---
     const PIPELINE_STEPS = ['lead', 'tasting', 'proposal', 'sold']
     const getStepLabel = (step) => { if (step === 'sold') return 'BOOKED'; return step.charAt(0).toUpperCase() + step.slice(1) }
     const setStatus = (step) => { setFormData(prev => ({ ...prev, status: step })) }
@@ -125,98 +93,184 @@ export default function CateringView({ formData, setFormData, clientId }) {
     const updateTimelineItem = (index, field, value) => { const currentTimeline = [...(formData.service_data?.timeline || [])]; currentTimeline[index][field] = value; updateService('timeline', currentTimeline) }
     const removeTimelineItem = (index) => { const currentTimeline = [...(formData.service_data?.timeline || [])]; currentTimeline.splice(index, 1); updateService('timeline', currentTimeline) }
 
-    // --- PRINTERS ---
-    const printInvoice = () => {
-        const printWindow = window.open('', '_blank')
-        const invoiceNum = clientId !== 'new' ? clientId.split('-')[0].toUpperCase() : 'DRAFT'
-        const today = new Date().toLocaleDateString()
-        const guests = formData.service_data?.guest_count || 0
-        const pricePerHead = formData.service_data?.price_per_head || 0
-        
-        const buildMenuSection = (title, items) => {
-            if (!items || items.length === 0) return ''
-            return `<div style="margin-bottom:5px;"><strong>${title}:</strong> ${items.join(', ')}</div>`
-        }
+    // --- PRINTER HELPER ---
+    const printViaHiddenFrame = (content) => {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0px';
+        iframe.style.height = '0px';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
 
-        const menuHtml = `
-            ${buildMenuSection('Entrees', entrees)}
-            ${buildMenuSection('Sides', sides)}
-            ${buildMenuSection('Drinks', drinks)}
-        `
-        
-        printWindow.document.write(`
-            <html>
-            <head>
-                <title>INVOICE #${invoiceNum}</title>
-                <style>
-                    body { font-family: 'Helvetica', sans-serif; padding: 40px; color: #333; max-width: 800px; margin: 0 auto; }
-                    .header { display: flex; justify-content: space-between; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 40px; }
-                    .biz-name { font-size: 24px; font-weight: bold; color: #000; text-transform: uppercase; }
-                    .biz-details { font-size: 14px; color: #666; margin-top: 5px; }
-                    .invoice-title { font-size: 36px; font-weight: 900; color: #1e293b; text-align: right; }
-                    .invoice-meta { text-align: right; font-size: 14px; color: #666; margin-top: 5px; }
-                    .bill-to { margin-bottom: 40px; }
-                    .bill-label { font-size: 12px; font-weight: bold; text-transform: uppercase; color: #94a3b8; margin-bottom: 5px; }
-                    .client-name { font-size: 18px; font-weight: bold; }
-                    .table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-                    .table th { text-align: left; background: #f8fafc; padding: 12px; border-bottom: 2px solid #e2e8f0; font-size: 12px; font-weight: bold; color: #64748b; text-transform: uppercase; }
-                    .table td { padding: 15px 12px; border-bottom: 1px solid #f1f5f9; }
-                    .total-section { display: flex; justify-content: flex-end; }
-                    .total-grid { width: 300px; }
-                    .total-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
-                    .grand-total { font-size: 20px; font-weight: bold; border-top: 2px solid #000; padding-top: 10px; margin-top: 10px; color: #000; }
-                    .footer { margin-top: 60px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #eee; padding-top: 20px; }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <div>
-                        <div class="biz-name">${businessProfile?.business_name || 'CATERING SERVICE'}</div>
-                        <div class="biz-details">${businessProfile?.city || ''}, ${businessProfile?.state || ''}</div>
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(content);
+        doc.close();
+
+        iframe.contentWindow.focus();
+        setTimeout(() => {
+            iframe.contentWindow.print();
+            setTimeout(() => { document.body.removeChild(iframe) }, 1000); 
+        }, 500);
+    }
+
+    // --- PROPOSAL-STYLE INVOICE GENERATOR ---
+    const printInvoice = () => {
+        try {
+            const safeId = String(clientId || 'new')
+            const invoiceNum = safeId !== 'new' ? safeId.split('-')[0].toUpperCase() : 'DRAFT'
+            const today = new Date().toLocaleDateString()
+            const guests = formData.service_data?.guest_count || 0
+            const pricePerHead = formData.service_data?.price_per_head || 0
+            const total = parseFloat(formData.job_price || 0)
+            const businessName = businessProfile?.business_name || 'Catering Service'
+            const businessCity = businessProfile?.city || ''
+            const eventDate = formData.service_data?.event_date ? new Date(formData.service_data.event_date).toLocaleDateString() : 'TBD'
+            const eventTime = formData.service_data?.event_time || 'TBD'
+            
+            // Build Menu String
+            const menuItems = []
+            if (entrees.length) menuItems.push(`<strong>Entrees:</strong> ${entrees.join(', ')}`)
+            if (sides.length) menuItems.push(`<strong>Sides:</strong> ${sides.join(', ')}`)
+            if (drinks.length) menuItems.push(`<strong>Drinks:</strong> ${drinks.join(', ')}`)
+            const menuHtml = menuItems.length ? menuItems.join('<br/>') : 'Custom Menu'
+
+            // Build Payment Schedule Rows
+            const paymentRowsHtml = paymentPlan.length > 0 ? paymentPlan.map((item, index) => {
+                const dateStr = item.date ? new Date(item.date).toLocaleDateString() : 'TBD'
+                const amountStr = item.amount ? `$${parseFloat(item.amount).toLocaleString(undefined, {minimumFractionDigits: 2})}` : '$0.00'
+                const statusBadge = item.paid 
+                    ? '<span style="background:#dcfce7; color:#166534; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; border: 1px solid #bbf7d0;">PAID</span>' 
+                    : '<span style="background:#f1f5f9; color:#64748b; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; border: 1px solid #e2e8f0;">UNPAID</span>'
+                
+                return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; font-size: 14px;">
+                        <div><strong style="color:#1e3a8a">Payment #${index + 1}</strong> <span style="color:#64748b; margin-left: 10px;">Due: ${dateStr}</span></div>
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <strong style="font-size: 16px;">${amountStr}</strong>
+                            ${statusBadge}
+                        </div>
                     </div>
-                    <div>
-                        <div class="invoice-title">INVOICE</div>
-                        <div class="invoice-meta">#${invoiceNum}</div>
-                        <div class="invoice-meta">Date: ${today}</div>
+                `
+            }).join('') : '<div style="padding: 15px; font-style: italic; color: #94a3b8;">Total due upon receipt.</div>'
+
+
+            const content = `
+                <html>
+                <head>
+                    <title>INVOICE #${invoiceNum}</title>
+                    <style>
+                        body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 50px; color: #333; max-width: 900px; margin: 0 auto; line-height: 1.5; }
+                        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1e3a8a; padding-bottom: 20px; margin-bottom: 40px; }
+                        .biz-title { font-size: 28px; font-weight: 900; text-transform: uppercase; color: #1e3a8a; letter-spacing: 1px; margin: 0; }
+                        .biz-details { color: #64748b; font-size: 14px; margin-top: 5px; }
+                        .invoice-label { font-size: 40px; font-weight: 900; color: #e2e8f0; text-align: right; line-height: 0.8; margin: 0; }
+                        .invoice-meta { text-align: right; font-size: 15px; font-weight: bold; color: #334155; margin-top: 10px; }
+                        
+                        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px; }
+                        .summary-box { background: #f8fafc; padding: 25px; borderRadius: 12px; border: 1px solid #e2e8f0; }
+                        .box-label { font-size: 12px; font-weight: bold; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px; letter-spacing: 0.5px; }
+                        .client-name { font-size: 20px; font-weight: bold; color: #1e293b; margin-bottom: 5px; }
+                        .info-line { font-size: 14px; color: #475569; margin-bottom: 4px; display: flex; gap: 8px; }
+
+                        .table-container { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 30px; }
+                        table { width: 100%; border-collapse: collapse; }
+                        th { background: #1e3a8a; color: white; text-align: left; padding: 15px; text-transform: uppercase; font-size: 13px; letter-spacing: 0.5px; }
+                        td { padding: 18px 15px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+                        .menu-details { font-size: 13px; color: #475569; margin-top: 10px; line-height: 1.6; padding-left: 10px; border-left: 3px solid #cbd5e1; }
+                        
+                        .totals-section { display: flex; justify-content: flex-end; margin-bottom: 40px; }
+                        .totals-box { width: 300px; }
+                        .total-row { display: flex; justify-content: space-between; padding: 10px 0; font-size: 15px; color: #475569; }
+                        .grand-total { font-size: 26px; font-weight: 900; color: #1e3a8a; border-top: 3px solid #1e3a8a; padding-top: 15px; margin-top: 10px; }
+
+                        .payment-section { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 25px; page-break-inside: avoid; }
+                        .footer { margin-top: 50px; text-align: center; font-size: 13px; color: #94a3b8; border-top: 1px solid #eee; padding-top: 30px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div>
+                            <h1 class="biz-title">${businessName}</h1>
+                            <div class="biz-details">${businessCity}</div>
+                        </div>
+                        <div>
+                            <h1 class="invoice-label">INVOICE</h1>
+                            <div class="invoice-meta">#${invoiceNum}</div>
+                            <div class="invoice-meta">Issued: ${today}</div>
+                        </div>
                     </div>
-                </div>
-                <div class="bill-to">
-                    <div class="bill-label">Bill To:</div>
-                    <div class="client-name">${formData.full_name}</div>
-                    <div>${formData.address}</div>
-                    <div style="margin-top:5px; font-size:14px; color:#666;">Event: ${formData.service_data?.event_date || 'TBD'}</div>
-                </div>
-                <table class="table">
-                    <thead><tr><th width="60%">Service Details</th><th width="10%">Qty</th><th width="15%">Rate</th><th width="15%" style="text-align:right">Amount</th></tr></thead>
-                    <tbody>
-                        <tr>
-                            <td>
-                                <strong>Event Service Package</strong>
-                                <div style="font-size:12px; color:#666; margin-top:8px;">${menuHtml || 'Custom Menu'}</div>
-                            </td>
-                            <td>${guests}</td>
-                            <td>$${pricePerHead}</td>
-                            <td style="text-align:right">$${(guests * pricePerHead).toLocaleString()}</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="total-section">
-                    <div class="total-grid">
-                        <div class="total-row grand-total"><span>Total</span><span>$${totalJobPrice.toLocaleString()}</span></div>
-                        <div class="total-row" style="color:#16a34a; font-weight:bold;"><span>Paid</span><span>-$${totalCollected.toLocaleString()}</span></div>
-                        <div class="total-row" style="color:#dc2626; font-weight:bold; font-size:16px;"><span>Balance</span><span>$${balanceDue.toLocaleString()}</span></div>
+
+                    <div class="summary-grid">
+                        <div class="summary-box">
+                            <div class="box-label">Bill To</div>
+                            <div class="client-name">${formData.full_name}</div>
+                            ${formData.address ? `<div class="info-line">${formData.address}</div>` : ''}
+                            ${formData.phone ? `<div class="info-line">${formData.phone}</div>` : ''}
+                            ${formData.email ? `<div class="info-line">${formData.email}</div>` : ''}
+                        </div>
+                        <div class="summary-box" style="background: #f0f9ff; border-color: #bae6fd;">
+                            <div class="box-label" style="color: #0284c7; border-color: #bae6fd;">Event Details</div>
+                            <div class="info-line"><strong>Date:</strong> ${eventDate}</div>
+                            <div class="info-line"><strong>Time:</strong> ${eventTime}</div>
+                            <div class="info-line"><strong>Guest Count:</strong> ${guests}</div>
+                        </div>
                     </div>
-                </div>
-                <div class="footer">Thank you for your business.</div>
-            </body>
-            </html>
-        `)
-        printWindow.document.close(); printWindow.print()
+
+                    <div class="table-container">
+                        <table>
+                            <thead><tr><th width="55%">Description</th><th width="15%">Guests</th><th width="15%">Rate</th><th width="15%" style="text-align:right">Amount</th></tr></thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <strong style="font-size: 16px; color: #1e293b;">Catering Service Package</strong>
+                                        <div class="menu-details">
+                                            ${menuHtml}
+                                        </div>
+                                        ${formData.job_notes ? `<div style="margin-top: 15px; font-size: 13px; color: #64748b;"><strong>Notes:</strong> ${formData.job_notes}</div>` : ''}
+                                    </td>
+                                    <td style="font-size: 15px; font-weight: bold;">${guests}</td>
+                                    <td style="font-size: 15px; font-weight: bold;">$${pricePerHead.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                                    <td style="text-align:right; font-size: 16px; font-weight: bold;">$${(guests * pricePerHead).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="totals-section">
+                        <div class="totals-box">
+                            <div class="total-row"><span>Subtotal</span><span>$${total.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>
+                            <div class="total-row grand-total"><span>Total</span><span>$${total.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>
+                        </div>
+                    </div>
+
+                    <div class="payment-section">
+                         <div class="box-label" style="margin-bottom: 20px;">Payment Schedule & Terms</div>
+                         ${paymentRowsHtml}
+                         <div class="total-row" style="margin-top: 20px; border-top: 2px solid #e2e8f0; padding-top: 15px; font-weight: bold;">
+                            <span>Total Paid</span>
+                            <span style="color: #166534;">$${totalCollected.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                        </div>
+                         <div class="total-row" style="font-size: 18px; font-weight: 900; color: #dc2626;">
+                            <span>Balance Due</span>
+                            <span>$${balanceDue.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                        </div>
+                    </div>
+
+                    <div class="footer">
+                        Thank you for your business. Please make checks payable to ${businessName}.
+                    </div>
+                </body>
+                </html>
+            `
+            printViaHiddenFrame(content);
+        } catch (error) {
+            alert("Error printing invoice: " + error.message)
+        }
     }
 
     const printKitchenSheet = () => {
-        const printWindow = window.open('', '_blank')
-        printWindow.document.write(`
+        const content = `
             <html><head><title>KITCHEN SHEET</title>
             <style>
                 body{font-family:sans-serif;padding:40px;}
@@ -245,25 +299,16 @@ export default function CateringView({ formData, setFormData, clientId }) {
                 <div style="font-size:18px;">${formData.job_notes || 'No custom notes.'}</div>
                 ${formData.service_data?.kitchen_notes ? `<div class="section-title">INSTRUCTIONS</div><div style="font-size:18px;">${formData.service_data.kitchen_notes}</div>` : ''}
             </body></html>
-        `)
-        printWindow.document.close(); printWindow.print()
-    }
-    
-    const printRunOfShow = () => {
-        const timeline = formData.service_data?.timeline || []
-        const printWindow = window.open('', '_blank')
-        printWindow.document.write(`<html><head><title>RUN OF SHOW</title><style>body{font-family:sans-serif;padding:40px;}.header{border-bottom:2px solid #000;margin-bottom:30px;}.title{font-size:32px;font-weight:bold;}.table{width:100%;border-collapse:collapse;margin-top:20px;}th{text-align:left;background:#eee;padding:10px;border-bottom:2px solid #000;}td{padding:15px 10px;border-bottom:1px solid #ccc;}</style></head><body><div class="header"><div class="title">Run of Show</div><div>${formData.full_name}</div></div><table class="table"><thead><tr><th width="150">TIME</th><th>ACTIVITY</th></tr></thead><tbody>${timeline.sort((a,b)=>a.time.localeCompare(b.time)).map(i=>`<tr><td>${i.time}</td><td>${i.action}</td></tr>`).join('')}</tbody></table></body></html>`)
-        printWindow.document.close(); printWindow.print()
+        `
+        printViaHiddenFrame(content);
     }
 
-    // Styles
     const sectionStyle = { background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '20px' }
     const labelStyle = { display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#64748b', marginBottom: '5px' }
     const inputStyle = { width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }
     const timeline = formData.service_data?.timeline || []
     const currentStep = formData.status || 'lead'
 
-    // Dropdown Component (Accepts Filtered Options)
     const MenuDropdown = ({ label, categoryList, categoryKey, options }) => (
         <div style={{marginBottom:'25px'}}>
             <label style={{...labelStyle, marginBottom:'8px', display:'flex', alignItems:'center', gap:'5px', color:'#334155', textTransform: 'uppercase', letterSpacing: '0.5px'}}>
@@ -314,21 +359,21 @@ export default function CateringView({ formData, setFormData, clientId }) {
                 </div>
             </div>
 
-            {/* CALCULATOR (FIXED WITH LOCAL BUFFERS) */}
+            {/* CALCULATOR */}
             <div style={sectionStyle}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                     <div><label style={labelStyle}>Event Date</label><input type="date" value={formData.service_data?.event_date || ''} onChange={e => updateService('event_date', e.target.value)} style={inputStyle} /></div>
                     <div><label style={labelStyle}>Service Time</label><input type="time" value={formData.service_data?.event_time || ''} onChange={e => updateService('event_time', e.target.value)} style={inputStyle} /></div>
                     
-                    {/* FIXED: GUEST COUNT INPUT */}
+                    {/* GUEST COUNT */}
                     <div>
                         <label style={labelStyle}>Guest Count</label>
                         <input 
                             type="number" 
                             placeholder="0" 
-                            value={localGuests} // Use Local Buffer
-                            onChange={e => setLocalGuests(e.target.value)} // Update Buffer immediately
-                            onBlur={e => updateService('guest_count', e.target.value)} // Save & Calc on click away
+                            value={localGuests} 
+                            onChange={e => setLocalGuests(e.target.value)}
+                            onBlur={e => updateService('guest_count', e.target.value)}
                             style={{...inputStyle, fontWeight:'bold', color:'#2563EB'}} 
                         />
                     </div>
@@ -336,7 +381,7 @@ export default function CateringView({ formData, setFormData, clientId }) {
 
                 <div style={{ background:'#eff6ff', padding:'15px', borderRadius:'8px', border:'1px solid #bfdbfe', display:'flex', gap:'15px', alignItems:'flex-end' }}>
                     
-                    {/* FIXED: PRICE PER PERSON INPUT */}
+                    {/* PRICE PER PERSON */}
                     <div style={{flex:1}}>
                         <label style={{...labelStyle, color:'#1e40af'}}>Price Per Person ($)</label>
                         <div style={{position:'relative'}}>
@@ -344,9 +389,9 @@ export default function CateringView({ formData, setFormData, clientId }) {
                             <input 
                                 type="number" 
                                 placeholder="0.00" 
-                                value={localPrice} // Use Local Buffer
-                                onChange={e => setLocalPrice(e.target.value)} // Update Buffer immediately
-                                onBlur={e => updateService('price_per_head', e.target.value)} // Save & Calc on click away
+                                value={localPrice}
+                                onChange={e => setLocalPrice(e.target.value)} 
+                                onBlur={e => updateService('price_per_head', e.target.value)} 
                                 style={{...inputStyle, paddingLeft:'25px', borderColor:'#bfdbfe'}} 
                             />
                         </div>
@@ -419,11 +464,10 @@ export default function CateringView({ formData, setFormData, clientId }) {
             {/* ACTION BUTTONS */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '20px' }}>
                 <button onClick={printInvoice} style={{ background: '#059669', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}><DollarSign size={16} /> Print Invoice</button>
-                <button onClick={printRunOfShow} style={{ background: 'white', color: '#334155', border: '1px solid #cbd5e1', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', fontSize: '13px' }}><FileText size={16} /> Run of Show</button>
                 <button onClick={printKitchenSheet} style={{ background: '#0f172a', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', fontSize: '13px' }}><Printer size={16} /> Kitchen Sheet</button>
             </div>
 
-            {/* MENU CONFIGURATION (Filtered) */}
+            {/* MENU CONFIGURATION */}
             <div style={sectionStyle}>
                 <h4 style={{marginTop:0, marginBottom:'25px', color:'#334155'}}>MENU CONFIGURATION</h4>
                 

@@ -149,7 +149,7 @@ export default function Dashboard() {
         <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'sans-serif' }}>
             
             {/* --- HERO SECTION --- */}
-            <div style={{ 
+            <div className="hero-section" style={{ 
                 marginBottom: '30px', 
                 background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', 
                 borderRadius: '16px', color: 'white', padding: '40px',
@@ -160,7 +160,7 @@ export default function Dashboard() {
                     <div style={{ fontSize: '14px', opacity: 0.8, marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '1px' }}>{dateStr}</div>
                     <h1 style={{ margin: 0, fontSize: '36px', fontWeight: '800' }}>{greeting}, <span style={{color: '#60a5fa'}}>{businessName}</span>.</h1>
                 </div>
-                <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', padding: '15px 25px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '15px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div className="weather-widget" style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', padding: '15px 25px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '15px', border: '1px solid rgba(255,255,255,0.1)' }}>
                     <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: '32px', fontWeight: 'bold' }}>{weather.temp}°</div>
                         <div style={{ fontSize: '12px', opacity: 0.8 }}>{user?.user_metadata?.city || 'Local Weather'}</div>
@@ -241,7 +241,8 @@ export default function Dashboard() {
                     <button onClick={() => navigate('/analytics')} style={{ color: '#64748b', background:'none', border:'none', cursor:'pointer', fontWeight:'bold', fontSize:'13px' }}>View Full Report →</button>
                 </div>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginTop:'10px' }}>
+                {/* FIX: RESPONSIVE GRID (Auto Fit) */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px', marginTop:'10px' }}>
                     <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #94a3b8' }}>
                         <div style={{fontSize:'12px', fontWeight:'bold', color:'#64748b', marginBottom:'5px', display:'flex', alignItems:'center', gap:'5px'}}><Users size={14}/> LEADS</div>
                         <div style={{fontSize:'24px', fontWeight:'900', color:'#334155'}}>{stats.leads}</div>
@@ -260,6 +261,13 @@ export default function Dashboard() {
                     </div>
                 </div>
             </div>
+
+            <style>{`
+                @media (max-width: 600px) {
+                    .hero-section { flex-direction: column; text-align: center; gap: 20px; }
+                    .weather-widget { width: 100%; justify-content: center; }
+                }
+            `}</style>
 
         </div>
     )
