@@ -14,6 +14,8 @@ import Login from './pages/Login'
 import UpdatePassword from './pages/UpdatePassword'
 import Settings from './pages/Settings'
 import SignContract from './pages/SignContract'
+import Privacy from './pages/Privacy'
+import Terms from './pages/Terms'
 
 // --- COMPONENT IMPORTS ---
 import Sidebar from './components/Sidebar'
@@ -82,8 +84,13 @@ function App() {
     return (
         <Router>
             <Routes>
+                {/* PUBLIC ROUTES (No Login Required) */}
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
                 <Route path="/sign/:id" element={<SignContract />} />
                 <Route path="/update-password" element={<UpdatePassword />} />
+                
+                {/* Catch-all sends to Login */}
                 <Route path="*" element={<Login />} />
             </Routes>
         </Router>
@@ -108,7 +115,6 @@ function App() {
             backgroundColor: '#f8fafc'
         }}>
             <Routes>
-                {/* FIX: Added explicit /dashboard route */}
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 
@@ -120,6 +126,10 @@ function App() {
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/sign/:id" element={<SignContract />} />
                 <Route path="/update-password" element={<UpdatePassword />} />
+                
+                {/* Legal Pages (Also accessible inside) */}
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
             </Routes>
         </div>
     </Router>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { Loader2, Mail, Lock, Chrome, CheckCircle } from 'lucide-react'
 
 export default function Login() {
@@ -77,72 +77,81 @@ export default function Login() {
             
             {/* LEFT: FORM SECTION */}
             <div className="form-section">
-                <div style={{ marginBottom: '40px' }}>
-                    <div style={{ background: '#0f172a', color: 'white', width: '40px', height: '40px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', marginBottom: '20px', fontSize:'18px' }}>CF</div>
-                    <h1 style={{ fontSize: '32px', margin: '0 0 10px 0', color: '#1e293b', fontWeight:'800' }}>{isSignUp ? 'Create Account' : 'Welcome back.'}</h1>
-                    <p style={{ color: '#64748b', margin: 0, fontSize:'15px' }}>
-                        {isSignUp ? 'Start managing your catering business today.' : 'Enter your credentials to access your workspace.'}
-                    </p>
-                </div>
-
-                <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    <div>
-                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#475569', marginBottom: '8px' }}>Email Address</label>
-                        <div style={{ position: 'relative' }}>
-                            <Mail size={18} color="#94a3b8" style={{ position: 'absolute', left: '15px', top: '14px' }} />
-                            <input 
-                                type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="chef@example.com"
-                                style={{ width: '100%', padding: '12px 12px 12px 45px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none', boxSizing:'border-box' }}
-                            />
-                        </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <div style={{ marginBottom: '40px' }}>
+                        <div style={{ background: '#0f172a', color: 'white', width: '40px', height: '40px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', marginBottom: '20px', fontSize:'18px' }}>CF</div>
+                        <h1 style={{ fontSize: '32px', margin: '0 0 10px 0', color: '#1e293b', fontWeight:'800' }}>{isSignUp ? 'Create Account' : 'Welcome back.'}</h1>
+                        <p style={{ color: '#64748b', margin: 0, fontSize:'15px' }}>
+                            {isSignUp ? 'Start managing your catering business today.' : 'Enter your credentials to access your workspace.'}
+                        </p>
                     </div>
 
-                    <div>
-                        <div style={{ display:'flex', justifyContent:'space-between' }}>
-                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#475569', marginBottom: '8px' }}>Password</label>
-                            {!isSignUp && <span style={{ fontSize:'12px', color:'#2563EB', cursor:'pointer' }}>Forgot password?</span>}
-                        </div>
-                        <div style={{ position: 'relative' }}>
-                            <Lock size={18} color="#94a3b8" style={{ position: 'absolute', left: '15px', top: '14px' }} />
-                            <input 
-                                type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••"
-                                style={{ width: '100%', padding: '12px 12px 12px 45px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none', boxSizing:'border-box' }}
-                            />
-                        </div>
-                        {isSignUp && password.length > 0 && (
-                            <div style={{ marginTop: '12px', background:'#f8fafc', padding:'10px', borderRadius:'8px', border:'1px solid #f1f5f9' }}>
-                                <div style={{ display: 'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'5px', fontWeight:'bold', color: getStrengthColor() }}>
-                                    <span>Strength</span><span>{getStrengthLabel()}</span>
-                                </div>
-                                <div style={{ display: 'flex', height: '4px', gap: '5px' }}>
-                                    {[1, 2, 3, 4, 5].map(i => (
-                                        <div key={i} style={{ flex: 1, borderRadius: '2px', background: strength >= i ? getStrengthColor() : '#e2e8f0', transition: '0.3s' }}></div>
-                                    ))}
-                                </div>
+                    <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#475569', marginBottom: '8px' }}>Email Address</label>
+                            <div style={{ position: 'relative' }}>
+                                <Mail size={18} color="#94a3b8" style={{ position: 'absolute', left: '15px', top: '14px' }} />
+                                <input 
+                                    type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="chef@example.com"
+                                    style={{ width: '100%', padding: '12px 12px 12px 45px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none', boxSizing:'border-box' }}
+                                />
                             </div>
-                        )}
+                        </div>
+
+                        <div>
+                            <div style={{ display:'flex', justifyContent:'space-between' }}>
+                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#475569', marginBottom: '8px' }}>Password</label>
+                                {!isSignUp && <span style={{ fontSize:'12px', color:'#2563EB', cursor:'pointer' }}>Forgot password?</span>}
+                            </div>
+                            <div style={{ position: 'relative' }}>
+                                <Lock size={18} color="#94a3b8" style={{ position: 'absolute', left: '15px', top: '14px' }} />
+                                <input 
+                                    type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••"
+                                    style={{ width: '100%', padding: '12px 12px 12px 45px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none', boxSizing:'border-box' }}
+                                />
+                            </div>
+                            {isSignUp && password.length > 0 && (
+                                <div style={{ marginTop: '12px', background:'#f8fafc', padding:'10px', borderRadius:'8px', border:'1px solid #f1f5f9' }}>
+                                    <div style={{ display: 'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'5px', fontWeight:'bold', color: getStrengthColor() }}>
+                                        <span>Strength</span><span>{getStrengthLabel()}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', height: '4px', gap: '5px' }}>
+                                        {[1, 2, 3, 4, 5].map(i => (
+                                            <div key={i} style={{ flex: 1, borderRadius: '2px', background: strength >= i ? getStrengthColor() : '#e2e8f0', transition: '0.3s' }}></div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <button type="submit" disabled={loading} style={{ background: '#0f172a', color: 'white', border: 'none', padding: '14px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '10px' }}>
+                            {loading ? <Loader2 className="spin" size={20}/> : (isSignUp ? 'Create Account' : 'Sign In')}
+                        </button>
+                    </form>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', margin: '30px 0' }}>
+                        <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
+                        <div style={{ fontSize: '12px', color: '#94a3b8' }}>OR CONTINUE WITH</div>
+                        <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
                     </div>
 
-                    <button type="submit" disabled={loading} style={{ background: '#0f172a', color: 'white', border: 'none', padding: '14px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '10px' }}>
-                        {loading ? <Loader2 className="spin" size={20}/> : (isSignUp ? 'Create Account' : 'Sign In')}
+                    <button onClick={handleGoogleLogin} style={{ background: 'white', border: '1px solid #cbd5e1', color: '#475569', padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                        <Chrome size={18} color="#EA4335" /> Google
                     </button>
-                </form>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', margin: '30px 0' }}>
-                    <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
-                    <div style={{ fontSize: '12px', color: '#94a3b8' }}>OR CONTINUE WITH</div>
-                    <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
+                    <div style={{ textAlign: 'center', marginTop: '30px', fontSize: '14px', color: '#64748b' }}>
+                        {isSignUp ? "Already have an account?" : "Don't have an account?"}
+                        <button onClick={() => { setIsSignUp(!isSignUp); setPassword(''); }} style={{ background: 'none', border: 'none', color: '#2563EB', fontWeight: 'bold', cursor: 'pointer', marginLeft: '5px' }}>
+                            {isSignUp ? 'Sign In' : 'Create one'}
+                        </button>
+                    </div>
                 </div>
 
-                <button onClick={handleGoogleLogin} style={{ background: 'white', border: '1px solid #cbd5e1', color: '#475569', padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-                    <Chrome size={18} color="#EA4335" /> Google
-                </button>
-
-                <div style={{ textAlign: 'center', marginTop: '30px', fontSize: '14px', color: '#64748b' }}>
-                    {isSignUp ? "Already have an account?" : "Don't have an account?"}
-                    <button onClick={() => { setIsSignUp(!isSignUp); setPassword(''); }} style={{ background: 'none', border: 'none', color: '#2563EB', fontWeight: 'bold', cursor: 'pointer', marginLeft: '5px' }}>
-                        {isSignUp ? 'Sign In' : 'Create one'}
-                    </button>
+                {/* STRIPE COMPLIANCE FOOTER (Added Here) */}
+                <div style={{ textAlign: 'center', fontSize: '11px', color: '#94a3b8', padding: '20px 0', borderTop: '1px solid #f1f5f9' }}>
+                    <Link to="/privacy" style={{ cursor: 'pointer', marginRight: '15px', textDecoration: 'none', color: '#94a3b8' }}>Privacy Policy</Link>
+                    <Link to="/terms" style={{ cursor: 'pointer', marginRight: '15px', textDecoration: 'none', color: '#94a3b8' }}>Terms of Service</Link>
+                    <span>© 2026 CaterFlow OS</span>
                 </div>
             </div>
 
@@ -175,9 +184,12 @@ export default function Login() {
                     flex: 1;
                     display: flex;
                     flex-direction: column;
-                    justify-content: center;
+                    justify-content: space-between; /* Ensures footer stays at bottom if height allows */
                     padding: 40px 60px;
                     max-width: 500px;
+                    height: 100vh;
+                    box-sizing: border-box;
+                    overflow-y: auto;
                 }
                 .image-section {
                     flex: 1.2;
