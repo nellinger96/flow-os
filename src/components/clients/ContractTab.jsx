@@ -123,7 +123,7 @@ export default function ContractTab({ client, savedClient, dirty, onClientReplac
                         <div className="min-w-0 flex-1">
                             <div className="font-bold text-green-800">{t('contract.signed')}</div>
                             <div className="text-sm text-green-700">
-                                {t('contract.signedBy', { name: current.signed_by || '—' })}
+                                {current.signed_by ? t('contract.signedBy', { name: current.signed_by }) : t('contract.signedNoName')}
                                 {current.signed_at && ` ${t('contract.signedAt', { date: formatDateTime(current.signed_at, i18n.language) })}`}
                             </div>
                         </div>

@@ -53,8 +53,24 @@ function ClientEditor({ saved, onSaved, onDeleted, onBack, dirtyRef, ...detailPr
 
         const { data, error } = await supabase.from('customers').update(payload).eq('id', draft.id).select().single()
         setSaving(false)
-        if (error) return alert(t('clients.saveFailed', { message: error.message }))
+        if (error) {
+            alert(t('clients.saveFailed', { message: error.message }))
+            return false
+        }
         replace(data)
+        return true
+    }
+
+    // Save a single change right away (e.g. status), keeping other unsaved edits
+    async function quickUpdate(patch) {
+        const { data, error } = await supabase.from('customers').update(patch).eq('id', draft.id).select().single()
+        if (error) {
+            alert(t('clients.saveFailed', { message: error.message }))
+            return false
+        }
+        onSaved(data)
+        setDraft(prev => ({ ...prev, ...patch }))
+        return true
     }
 
     async function remove() {
@@ -76,6 +92,8 @@ function ClientEditor({ saved, onSaved, onDeleted, onBack, dirtyRef, ...detailPr
                 dirty={dirty}
                 saving={saving}
                 onSave={save}
+                onDiscard={() => setDraft(structuredClone(saved))}
+                onQuickUpdate={quickUpdate}
                 onDelete={remove}
                 onBack={onBack}
                 onGrocery={() => setShowGrocery(true)}

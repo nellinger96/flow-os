@@ -60,7 +60,9 @@
     "deleteFailed": "Delete failed: {{message}}",
     "createFailed": "Could not create client: {{message}}",
     "pleaseLogIn": "Please log in.",
-    "discardChanges": "You have unsaved changes. Discard them?"
+    "discardChanges": "You have unsaved changes. Discard them?",
+    "saveChanges": "Save changes",
+    "contactInfo": "Contact info"
   },
   "tabs": {
     "event": "Event",
@@ -118,7 +120,10 @@
       "Drink": "Drink",
       "Dessert": "Dessert",
       "Supplies": "Supplies"
-    }
+    },
+    "onThisEvent": "On this event",
+    "nothingSelected": "Nothing selected yet. Add items below.",
+    "addItems": "Add items"
   },
   "payments": {
     "booked": "Contract total",
@@ -164,7 +169,8 @@
     "uploading": "Uploading…",
     "uploaded": "Uploaded!",
     "viewFile": "View uploaded file",
-    "close": "Close"
+    "close": "Close",
+    "signedNoName": "Signer's name wasn't recorded"
   },
   "doc": {
     "contract": "Service Agreement",
@@ -199,5 +205,23 @@
     "signedOn": "Signed on",
     "termsAccepted": "Client accepted the Terms & Conditions.",
     "thankYou": "Thank you for your business."
+  },
+  "summary": {
+    "editInfo": "Edit info",
+    "status": "Status",
+    "call": "Call",
+    "text": "Text",
+    "map": "Map",
+    "eventDetails": "Event details",
+    "notesKitchen": "Notes & kitchen",
+    "noDate": "No event date yet",
+    "tapToAdd": "Tap to add",
+    "items_one": "{{count}} item",
+    "items_other": "{{count}} items",
+    "perPerson": "{{amount}}/person",
+    "paid": "Paid {{amount}}",
+    "owes": "Owes {{amount}}",
+    "paymentsLine": "{{paid}} of {{total}} paid",
+    "noPayments": "No payment schedule yet"
   }
 }

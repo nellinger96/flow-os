@@ -60,7 +60,9 @@
     "deleteFailed": "No se pudo eliminar: {{message}}",
     "createFailed": "No se pudo crear el cliente: {{message}}",
     "pleaseLogIn": "Inicia sesión.",
-    "discardChanges": "Tienes cambios sin guardar. ¿Descartarlos?"
+    "discardChanges": "Tienes cambios sin guardar. ¿Descartarlos?",
+    "saveChanges": "Guardar cambios",
+    "contactInfo": "Datos de contacto"
   },
   "tabs": {
     "event": "Evento",
@@ -118,7 +120,10 @@
       "Drink": "Bebida",
       "Dessert": "Postre",
       "Supplies": "Desechables y equipo"
-    }
+    },
+    "onThisEvent": "En este evento",
+    "nothingSelected": "Nada seleccionado. Agrega platillos abajo.",
+    "addItems": "Agregar platillos"
   },
   "payments": {
     "booked": "Total del contrato",
@@ -164,7 +169,8 @@
     "uploading": "Subiendo…",
     "uploaded": "¡Subido!",
     "viewFile": "Ver archivo subido",
-    "close": "Cerrar"
+    "close": "Cerrar",
+    "signedNoName": "No se guardó el nombre de quien firmó"
   },
   "doc": {
     "contract": "Contrato de servicio",
@@ -199,5 +205,23 @@
     "signedOn": "Firmado el",
     "termsAccepted": "El cliente aceptó los Términos y Condiciones.",
     "thankYou": "Gracias por su preferencia."
+  },
+  "summary": {
+    "editInfo": "Editar datos",
+    "status": "Estado",
+    "call": "Llamar",
+    "text": "Mensaje",
+    "map": "Mapa",
+    "eventDetails": "Detalles del evento",
+    "notesKitchen": "Notas y cocina",
+    "noDate": "Sin fecha de evento",
+    "tapToAdd": "Toca para agregar",
+    "items_one": "{{count}} platillo",
+    "items_other": "{{count}} platillos",
+    "perPerson": "{{amount}}/persona",
+    "paid": "Pagado {{amount}}",
+    "owes": "Debe {{amount}}",
+    "paymentsLine": "{{paid}} de {{total}} pagados",
+    "noPayments": "Sin plan de pagos"
   }
 }

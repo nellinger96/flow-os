@@ -29,3 +29,22 @@ export function menuSections(serviceData) {
     if (legacy.length) sections.push({ key: 'Entree', food: true, items: legacy, legacy: true })
     return sections
 }
+
+// Items on this event, grouped by category (a saved item filed under an older
+// category shows under its current one). Also used by the summary row.
+export function selectedMenu(serviceData, menuLibrary) {
+    const sd = serviceData || {}
+    const libraryCat = new Map(menuLibrary.map(s => [normalizeItem(s.name), categoryForService(s).key]))
+    const byKey = Object.fromEntries(MENU_CATEGORIES.map(c => [c.key, []]))
+    const seen = new Set()
+    MENU_CATEGORIES.forEach(cat => {
+        const stored = [...(sd[cat.field] || []), ...(cat.key === 'Entree' ? sd[LEGACY_MENU_FIELD] || [] : [])]
+        stored.forEach(name => {
+            const k = normalizeItem(name)
+            if (!k || seen.has(k)) return
+            seen.add(k)
+            byKey[libraryCat.get(k) || cat.key].push(name)
+        })
+    })
+    return { set: seen, groups: MENU_CATEGORIES.map(c => ({ ...c, items: byKey[c.key] })).filter(g => g.items.length) }
+}

@@ -67,7 +67,7 @@ export default function PaymentsTab({ client, setClient }) {
                     ['payments.balance', balance, balance > 0 ? 'text-red-600' : 'text-slate-400'],
                 ].map(([label, value, color]) => (
                     <div key={label} className="rounded-xl border border-slate-200 bg-white p-3">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t(label)}</div>
+                        <div className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-500">{t(label)}</div>
                         <div className={`mt-1 text-lg font-extrabold sm:text-xl ${color}`}>{money(value)}</div>
                     </div>
                 ))}
@@ -90,29 +90,35 @@ export default function PaymentsTab({ client, setClient }) {
 
                 <div className="space-y-2">
                     {plan.map((p, i) => (
-                        <div key={i} className="grid grid-cols-[1.5rem_1fr_1fr_auto] items-center gap-2 sm:grid-cols-[1.5rem_1fr_1fr_auto_auto]">
-                            <span className="text-xs font-bold text-slate-400">#{i + 1}</span>
-                            <input type="date" value={p.date || ''} onChange={e => editRow(i, 'date', e.target.value)} aria-label={t('payments.dueDate')} className={inputClass} />
-                            <div className="relative">
-                                <DollarSign size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input type="number" min="0" step="0.01" inputMode="decimal" value={p.amount ?? ''} onChange={e => editRow(i, 'amount', e.target.value)} aria-label={t('payments.amount')} className={`${inputClass} pl-7`} />
+                        <div key={i} className={`rounded-xl border p-3 ${p.paid ? 'border-green-200 bg-green-50/50' : 'border-slate-200'}`}>
+                            <div className="mb-2 flex items-center gap-2">
+                                <span className="w-7 shrink-0 text-sm font-bold text-slate-400">#{i + 1}</span>
+                                <span className="shrink-0 text-xs font-semibold text-slate-500">{t('payments.dueDate')}</span>
+                                <input type="date" value={p.date || ''} onChange={e => editRow(i, 'date', e.target.value)} aria-label={t('payments.dueDate')} className={`${inputClass} min-w-0 flex-1`} />
                             </div>
-                            <button
-                                onClick={() => editRow(i, 'paid', !p.paid)}
-                                className={`flex min-w-[5.5rem] items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs font-bold transition ${p.paid ? 'border-green-200 bg-green-100 text-green-700' : 'border-slate-200 bg-slate-50 text-slate-500 hover:border-green-300 hover:text-green-700'}`}
-                            >
-                                {p.paid ? <><Check size={14} /> {t('payments.paid')}</> : t('payments.markPaid')}
-                            </button>
-                            {!p.paid && toNumber(p.amount) > 0 ? (
+                            <div className="flex items-center gap-2">
+                                <div className="relative min-w-0 flex-1">
+                                    <DollarSign size={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <input type="number" min="0" step="0.01" inputMode="decimal" value={p.amount ?? ''} onChange={e => editRow(i, 'amount', e.target.value)} aria-label={t('payments.amount')} placeholder="0" className={`${inputClass} pl-8 font-semibold`} />
+                                </div>
                                 <button
-                                    onClick={() => payOnline(i, p.amount)}
-                                    disabled={processing !== null}
-                                    title={t('payments.payOnline')}
-                                    className="col-start-4 flex items-center justify-center rounded-lg bg-blue-600 p-2 text-white hover:bg-blue-700 disabled:opacity-50 sm:col-start-auto"
+                                    onClick={() => editRow(i, 'paid', !p.paid)}
+                                    className={`flex shrink-0 items-center justify-center gap-1 rounded-lg border px-3 py-2.5 text-sm font-bold transition ${p.paid ? 'border-green-300 bg-green-100 text-green-700' : 'border-slate-300 bg-white text-slate-600 active:bg-green-50'}`}
                                 >
-                                    {processing === i ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+                                    {p.paid ? <><Check size={16} /> {t('payments.paid')}</> : t('payments.markPaid')}
                                 </button>
-                            ) : <span className="hidden sm:block sm:w-8" />}
+                                {!p.paid && toNumber(p.amount) > 0 && (
+                                    <button
+                                        onClick={() => payOnline(i, p.amount)}
+                                        disabled={processing !== null}
+                                        title={t('payments.payOnline')}
+                                        aria-label={t('payments.payOnline')}
+                                        className="flex shrink-0 items-center justify-center rounded-lg bg-blue-600 p-2.5 text-white active:bg-blue-700 disabled:opacity-50"
+                                    >
+                                        {processing === i ? <Loader2 size={18} className="animate-spin" /> : <CreditCard size={18} />}
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     ))}
                 </div>
