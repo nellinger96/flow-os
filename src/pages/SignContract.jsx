@@ -2,20 +2,23 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { CheckCircle, PenTool, Calendar, MapPin, Clock, Users, ChevronRight, CreditCard, ShieldAlert, Utensils } from 'lucide-react'
-import confetti from 'canvas-confetti' 
+import confetti from 'canvas-confetti'
+import { useTranslation } from 'react-i18next'
+import { menuSections } from '../lib/menu'
+import { CONTRACT_TERMS, CURRENT_TERMS_VERSION } from '../lib/contractTerms'
+import { contractHtml, printHtml } from '../lib/printDocs'
+
+const MENU_TITLES = { Entree: 'Entrees', Side: 'Sides', Drink: 'Drinks', Dessert: 'Desserts', Supplies: 'Supplies & Equipment' }
 
 export default function SignContract() {
     const { id } = useParams()
+    const { t, i18n } = useTranslation()
     const [client, setClient] = useState(null)
     const [loading, setLoading] = useState(true)
     const [signature, setSignature] = useState('')
     const [signed, setSigned] = useState(false)
     const [error, setError] = useState(null)
     const [agreedToTerms, setAgreedToTerms] = useState(false)
-
-    useEffect(() => {
-        fetchContract()
-    }, [])
 
     async function fetchContract() {
         // SECURE FETCH: Uses the RPC bouncer function and the UUID from the URL
@@ -33,6 +36,11 @@ export default function SignContract() {
         if (clientData.contract_url === 'SIGNED_DIGITALLY') setSigned(true)
         setLoading(false)
     }
+
+    useEffect(() => {
+        fetchContract()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     async function handleSign() {
         if (!agreedToTerms) return alert("Please read and accept the Terms & Conditions.")
@@ -58,6 +66,7 @@ export default function SignContract() {
             alert("Error signing: " + error.message)
         } else {
             setSigned(true)
+            fetchContract() // load the signed snapshot so the client can print it
             confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } })
         }
     }
@@ -72,12 +81,8 @@ export default function SignContract() {
         
     const paymentPlan = client.service_data?.payment_plan || []
 
-    const entrees = client.service_data?.menu_entrees || []
-    const sides = client.service_data?.menu_sides || []
-    const drinks = client.service_data?.menu_drinks || []
-    const legacyMenu = client.service_data?.selected_menu_items || []
     
-    const hasMenu = entrees.length > 0 || sides.length > 0 || drinks.length > 0 || legacyMenu.length > 0
+    const hasMenu = menuSections(client.service_data).length > 0
 
     // --- ALREADY SIGNED VIEW ---
     if (signed) {
@@ -95,6 +100,14 @@ export default function SignContract() {
                     <div style={{fontSize:'20px', fontWeight:'bold', fontFamily:'monospace', color:'#334155'}}>{client.service_data?.signed_by || signature}</div>
                     <div style={{fontSize:'14px', color:'#64748b', marginTop:'5px'}}>{new Date(client.service_data?.signed_at || new Date()).toLocaleString()}</div>
                 </div>
+                {client.signed_contract && (
+                    <button
+                        onClick={() => printHtml(contractHtml({ contract: client.signed_contract, business: { business_name: client.signed_contract.business_name || client.business_name }, t, lng: i18n.language }))}
+                        style={{ marginTop: '20px', padding: '14px 24px', background: '#0f172a', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer' }}
+                    >
+                        Print / Save a copy (PDF)
+                    </button>
+                )}
             </div>
         )
     }
@@ -151,43 +164,14 @@ export default function SignContract() {
                         {/* Dynamic Menu Display */}
                         {hasMenu ? (
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginTop: '20px' }}>
-                                
-                                {entrees.length > 0 && (
-                                    <div>
-                                        <div style={{fontSize:'12px', fontWeight:'bold', color:'#94a3b8', textTransform:'uppercase', marginBottom:'8px'}}>Entrees</div>
-                                        {entrees.map((item, i) => (
-                                            <div key={i} style={{marginBottom:'5px', fontWeight:'500', color:'#334155'}}>• {item}</div>
+                                {menuSections(client.service_data).map((section, si) => (
+                                    <div key={si}>
+                                        <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px' }}>{section.legacy ? 'Included Items' : MENU_TITLES[section.key]}</div>
+                                        {section.items.map((item, i) => (
+                                            <div key={i} style={{ color: '#334155', marginBottom: '4px' }}>• {item}</div>
                                         ))}
                                     </div>
-                                )}
-
-                                {sides.length > 0 && (
-                                    <div>
-                                        <div style={{fontSize:'12px', fontWeight:'bold', color:'#94a3b8', textTransform:'uppercase', marginBottom:'8px'}}>Sides</div>
-                                        {sides.map((item, i) => (
-                                            <div key={i} style={{marginBottom:'5px', fontWeight:'500', color:'#334155'}}>• {item}</div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {drinks.length > 0 && (
-                                    <div>
-                                        <div style={{fontSize:'12px', fontWeight:'bold', color:'#94a3b8', textTransform:'uppercase', marginBottom:'8px'}}>Drinks</div>
-                                        {drinks.map((item, i) => (
-                                            <div key={i} style={{marginBottom:'5px', fontWeight:'500', color:'#334155'}}>• {item}</div>
-                                        ))}
-                                    </div>
-                                )}
-                                
-                                {legacyMenu.length > 0 && (
-                                    <div>
-                                        <div style={{fontSize:'12px', fontWeight:'bold', color:'#94a3b8', textTransform:'uppercase', marginBottom:'8px'}}>Included Items</div>
-                                        {legacyMenu.map((item, i) => (
-                                            <div key={i} style={{marginBottom:'5px', fontWeight:'500', color:'#334155'}}>• {item}</div>
-                                        ))}
-                                    </div>
-                                )}
-
+                                ))}
                             </div>
                         ) : (
                             <div style={{ margin: '15px 0', fontSize: '14px', color: '#94a3b8', fontStyle: 'italic' }}>
@@ -236,12 +220,7 @@ export default function SignContract() {
                             <ShieldAlert size={20} /> Terms & Conditions
                         </h3>
                         <div style={{ height: '150px', overflowY: 'scroll', background: '#f1f5f9', padding: '15px', borderRadius: '8px', fontSize: '12px', color: '#475569', border: '1px solid #e2e8f0', marginTop: '15px' }}>
-                            <p><strong>1. Deposit & Payments:</strong> A non-refundable deposit is required to secure the date. Full payment is due as per the schedule above. Late payments may result in service cancellation.</p>
-                            <p><strong>2. Cancellations:</strong> Cancellations made less than 30 days before the event are subject to a 50% fee. Cancellations made less than 7 days prior are non-refundable.</p>
-                            <p><strong>3. Guest Count:</strong> Final guest count must be confirmed 7 days prior to the event. This count will be used for final billing and food preparation.</p>
-                            <p><strong>4. Leftovers:</strong> Any leftover food is the responsibility of the client. We are not responsible for food safety once it has been handed over or left at the venue.</p>
-                            <p><strong>5. Liability:</strong> We are not liable for any damages to the venue or personal property unless directly caused by our staff's negligence.</p>
-                            <p><strong>6. Service Time:</strong> Service will be provided for the specific hours listed. Additional hours will incur an extra charge.</p>
+                            {CONTRACT_TERMS[CURRENT_TERMS_VERSION].map(([title, text], i) => <p key={i}><strong>{i + 1}. {title}:</strong> {text}</p>)}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
                             <input 

@@ -11,6 +11,10 @@
 alter table public.customers add column if not exists signed_contract jsonb;
 alter table public.customers add column if not exists signed_at timestamptz;
 
+-- Allow cents in contract totals (e.g. 75 guests x $18.50). Widening only:
+-- every existing whole-dollar value is kept exactly.
+alter table public.customers alter column job_price type numeric(12,2) using job_price::numeric(12,2);
+
 -- ---------------------------------------------------------------------------
 -- 2. Only these service_data keys are ever shown to the client
 --    (kitchen notes, timeline, original SMS text, etc. stay private)
@@ -25,9 +29,28 @@ as $$
   from jsonb_each(coalesce(sd, '{}'::jsonb))
   where key in (
     'event_date', 'event_time', 'guest_count', 'price_per_head',
-    'menu_entrees', 'menu_sides', 'menu_drinks', 'selected_menu_items',
+    'menu_entrees', 'menu_sides', 'menu_drinks', 'menu_desserts', 'menu_supplies',
+    'selected_menu_items',
     'payment_plan', 'signed_by', 'signed_at', 'terms_accepted'
   )
+$$;
+
+-- Business name as the caterer set it in Settings (stored in auth metadata),
+-- falling back to profiles.business_name
+create or replace function public.business_name_for(owner uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(
+    nullif(btrim(u.raw_user_meta_data ->> 'business_name'), ''),
+    nullif(btrim(p.business_name), '')
+  )
+  from auth.users u
+  left join public.profiles p on p.id = u.id
+  where u.id = owner
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -41,12 +64,13 @@ returns table (
   address text,
   city text,
   job_notes text,
-  job_price bigint,
+  job_price numeric,
   status text,
   contract_url text,
   service_data jsonb,
   signed_contract jsonb,
-  signed_at timestamptz
+  signed_at timestamptz,
+  business_name text
 )
 language sql
 stable
@@ -63,7 +87,8 @@ as $$
     c.contract_url,
     public.contract_public_service_data(c.service_data),
     c.signed_contract,
-    c.signed_at
+    c.signed_at,
+    public.business_name_for(c.user_id)
   from public.customers c
   where c.public_token = token
     and token is not null
@@ -114,6 +139,8 @@ begin
       || jsonb_build_object('signed_by', v_name, 'signed_at', v_now, 'terms_accepted', true),
     signed_contract = jsonb_build_object(
       'version', 1,
+      'terms_version', 1,
+      'business_name', public.business_name_for(c.user_id),
       'signed_by', v_name,
       'signed_at', v_now,
       'terms_accepted', true,
@@ -145,6 +172,7 @@ $$;
 drop function if exists public.sign_contract_by_token(uuid, text);
 
 revoke all on function public.contract_public_service_data(jsonb) from public, anon, authenticated;
+revoke all on function public.business_name_for(uuid) from public, anon, authenticated;
 revoke all on function public.get_contract_by_token(uuid) from public;
 revoke all on function public.sign_contract(uuid, text) from public;
 revoke all on function public.sign_contract_by_token(uuid, jsonb) from public;

@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../supabaseClient'
+import { useTranslation } from 'react-i18next'
+import { supabase, isTestDatabase } from '../supabaseClient'
+import { LANGUAGES } from '../i18n'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Home, Users, FileText, BarChart3, Settings, LogOut, X, Calendar } from 'lucide-react'
 
 export default function Sidebar({ isOpen, onClose, onLogout }) {
     const navigate = useNavigate()
     const location = useLocation()
+    const { t, i18n } = useTranslation()
     const [businessName, setBusinessName] = useState('My Business')
 
     // Fetch Business Name on Load
@@ -21,12 +24,12 @@ export default function Sidebar({ isOpen, onClose, onLogout }) {
 
     // Define menu items (Tracker Removed)
     const menuItems = [
-        { label: 'Dashboard', path: '/', icon: <Home size={20} /> },
-        { label: 'Calendar', path: '/calendar', icon: <Calendar size={20} /> },
-        { label: 'Directory', path: '/clients', icon: <Users size={20} /> },
-        { label: 'Invoices', path: '/invoices', icon: <FileText size={20} /> },
-        { label: 'Analytics', path: '/analytics', icon: <BarChart3 size={20} /> },
-        { label: 'Settings', path: '/settings', icon: <Settings size={20} /> },
+        { label: t('nav.dashboard'), path: '/', icon: <Home size={20} /> },
+        { label: t('nav.calendar'), path: '/calendar', icon: <Calendar size={20} /> },
+        { label: t('nav.directory'), path: '/clients', icon: <Users size={20} /> },
+        { label: t('nav.invoices'), path: '/invoices', icon: <FileText size={20} /> },
+        { label: t('nav.analytics'), path: '/analytics', icon: <BarChart3 size={20} /> },
+        { label: t('nav.settings'), path: '/settings', icon: <Settings size={20} /> },
     ]
 
     const activeStyle = { background: '#2563EB', color: 'white' }
@@ -59,6 +62,7 @@ export default function Sidebar({ isOpen, onClose, onLogout }) {
                         }}>
                             CATERFLOW OS
                         </div>
+                        {isTestDatabase && <div style={{ marginTop: '6px', display: 'inline-block', background: '#fef3c7', color: '#b45309', fontSize: '10px', fontWeight: 'bold', padding: '2px 8px', borderRadius: '10px' }}>{t('common.testData')}</div>}
                     </div>
                     <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 0 }}>
                         <X size={24} />
@@ -91,11 +95,25 @@ export default function Sidebar({ isOpen, onClose, onLogout }) {
 
                 {/* FOOTER */}
                 <div style={{ padding: '20px', borderTop: '1px solid #e2e8f0' }}>
+                    <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>{t('common.language')}</div>
+                        <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', padding: '4px', borderRadius: '8px' }}>
+                            {LANGUAGES.map(l => (
+                                <button
+                                    key={l.code}
+                                    onClick={() => i18n.changeLanguage(l.code)}
+                                    style={{ flex: 1, padding: '6px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', background: i18n.language === l.code ? 'white' : 'transparent', color: i18n.language === l.code ? '#2563EB' : '#64748b', boxShadow: i18n.language === l.code ? '0 1px 2px rgba(0,0,0,0.1)' : 'none' }}
+                                >
+                                    {l.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                     <button 
                         onClick={onLogout}
                         style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', width: '100%', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
                     >
-                        <LogOut size={20} /> Sign Out
+                        <LogOut size={20} /> {t('nav.signOut')}
                     </button>
                 </div>
             </div>

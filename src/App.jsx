@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
 import { Menu } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { isTestDatabase } from './supabaseClient'
 
 // --- PAGE IMPORTS ---
 import LandingPage from './pages/LandingPage' // NEW
@@ -27,16 +29,17 @@ import SubscriptionGate from './components/SubscriptionGate' // NEW
 // --- TOP BAR COMPONENT ---
 function TopBar({ onOpenMenu }) {
     const location = useLocation()
-    
+    const { t } = useTranslation()
+
     // Dynamic Title based on route
-    let title = 'Dashboard'
-    if (location.pathname === '/calendar') title = 'Event Calendar'
-    if (location.pathname === '/map') title = 'Route Map'
-    if (location.pathname === '/analytics') title = 'Business Analytics'
-    if (location.pathname === '/clients') title = 'Directory'
-    if (location.pathname === '/invoices') title = 'Invoices'
-    if (location.pathname === '/settings') title = 'Business Settings'
-    if (location.pathname.includes('/sign')) title = 'Digital Contract'
+    let title = t('nav.dashboard')
+    if (location.pathname === '/calendar') title = t('nav.eventCalendar')
+    if (location.pathname === '/map') title = t('nav.routeMap')
+    if (location.pathname === '/analytics') title = t('nav.businessAnalytics')
+    if (location.pathname === '/clients') title = t('nav.directory')
+    if (location.pathname === '/invoices') title = t('nav.invoices')
+    if (location.pathname === '/settings') title = t('nav.businessSettings')
+    if (location.pathname.includes('/sign')) title = t('nav.digitalContract')
 
     return (
         <div style={{
@@ -49,6 +52,7 @@ function TopBar({ onOpenMenu }) {
                 <Menu size={28} />
             </button>
             <h2 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>{title}</h2>
+            {isTestDatabase && <span style={{ marginLeft: 'auto', background: '#fef3c7', color: '#b45309', fontSize: '11px', fontWeight: 'bold', padding: '4px 10px', borderRadius: '12px' }}>{t('common.testData')}</span>}
         </div>
     )
 }

@@ -1,12 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 
-// 1. Go to your Supabase Dashboard
-// 2. Click "Project Settings" (Gear icon at very bottom left)
-// 3. Click "API"
-// 4. Paste the "Project URL" inside the first quotes below
-// 5. Paste the "anon / public" Key inside the second quotes below
+// Production values are the fallback so existing builds keep working.
+// For local development, .env.development.local points at the local test
+// database (see `npx supabase start`), so `npm run dev` never touches live data.
+const PROD_URL = 'https://xtydncextvkyvefrhsvl.supabase.co'
+const PROD_KEY = 'sb_publishable_tyyvhYoRSNAWoGCfOLOUjA_JAu3h2bZ'
 
-const supabaseUrl = 'https://xtydncextvkyvefrhsvl.supabase.co'
-const supabaseKey = 'sb_publishable_tyyvhYoRSNAWoGCfOLOUjA_JAu3h2bZ'
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || PROD_URL
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || PROD_KEY
+
+export const isTestDatabase = supabaseUrl !== PROD_URL
 
 export const supabase = createClient(supabaseUrl, supabaseKey)

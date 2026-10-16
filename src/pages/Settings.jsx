@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { Plus, Trash2, Save, ArrowLeft, Building, Utensils, Coffee, Salad, Beef, Edit2, X, Check, CreditCard, CheckCircle, ExternalLink, LogOut } from 'lucide-react'
+import { Plus, Trash2, Save, ArrowLeft, Building, Utensils, Coffee, Salad, Beef, Edit2, X, Check, CreditCard, CheckCircle, ExternalLink, LogOut, CakeSlice, Package } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+
+const MENU_SECTIONS = [
+    { key: 'Entree', singular: 'Entree', label: 'Entrees', color: '#be123c', Icon: Beef },
+    { key: 'Side', singular: 'Side', label: 'Sides', color: '#15803d', Icon: Salad },
+    { key: 'Drink', singular: 'Drink', label: 'Drinks', color: '#b45309', Icon: Coffee },
+    { key: 'Dessert', singular: 'Dessert', label: 'Desserts', color: '#db2777', Icon: CakeSlice },
+    { key: 'Supplies', singular: 'Supplies', label: 'Supplies (not counted as food)', color: '#475569', Icon: Package },
+]
 
 export default function Settings() {
     const [profile, setProfile] = useState({ business_name: '', city: '', state: '', stripe_account_id: null })
@@ -166,9 +174,7 @@ export default function Settings() {
                 {/* Input Area */}
                 <div id="menu-input" className={`input-grid ${editingId ? 'editing' : ''}`}>
                     <select value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} className="std-input">
-                        <option value="Entree">Entree</option>
-                        <option value="Side">Side</option>
-                        <option value="Drink">Drink</option>
+                        {MENU_SECTIONS.map(({ key, singular }) => <option key={key} value={key}>{singular}</option>)}
                     </select>
                     <input placeholder="New Item Name (e.g. Tacos)" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="std-input" />
                     <button onClick={handleSaveItem} style={{ background: editingId ? '#ea580c' : '#2563EB', color: 'white', border: 'none', height: '42px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -179,54 +185,27 @@ export default function Settings() {
                 {/* VISUAL MENU DISPLAY */}
                 <div style={{ display: 'grid', gap: '20px', marginTop: '30px' }}>
                     
-                    {/* ENTREES */}
-                    <div className="menu-section">
-                        <h4 style={{margin: '0 0 10px 0', color: '#be123c', display:'flex', alignItems:'center', gap:'8px'}}><Beef size={18}/> Entrees</h4>
-                        <div className="tag-container">
-                            {getItemsByCategory('Entree').length === 0 && <span className="empty-msg">No entrees yet.</span>}
-                            {getItemsByCategory('Entree').map(item => (
-                                <div key={item.id} className="menu-tag" onClick={() => startEditing(item)}>
-                                    {item.name}
-                                    <button onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} className="del-btn"><X size={12}/></button>
-                                </div>
-                            ))}
+                    {MENU_SECTIONS.map(({ key, label, color, Icon }) => (
+                        <div key={key} className="menu-section">
+                            <h4 style={{margin: '0 0 10px 0', color, display:'flex', alignItems:'center', gap:'8px'}}><Icon size={18}/> {label}</h4>
+                            <div className="tag-container">
+                                {getItemsByCategory(key).length === 0 && <span className="empty-msg">No {label.toLowerCase()} yet.</span>}
+                                {getItemsByCategory(key).map(item => (
+                                    <div key={item.id} className="menu-tag" onClick={() => startEditing(item)}>
+                                        {item.name}
+                                        <button onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} className="del-btn"><X size={12}/></button>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                    </div>
-
-                    {/* SIDES */}
-                    <div className="menu-section">
-                        <h4 style={{margin: '0 0 10px 0', color: '#15803d', display:'flex', alignItems:'center', gap:'8px'}}><Salad size={18}/> Sides</h4>
-                        <div className="tag-container">
-                            {getItemsByCategory('Side').length === 0 && <span className="empty-msg">No sides yet.</span>}
-                            {getItemsByCategory('Side').map(item => (
-                                <div key={item.id} className="menu-tag" onClick={() => startEditing(item)}>
-                                    {item.name}
-                                    <button onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} className="del-btn"><X size={12}/></button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* DRINKS */}
-                    <div className="menu-section">
-                        <h4 style={{margin: '0 0 10px 0', color: '#b45309', display:'flex', alignItems:'center', gap:'8px'}}><Coffee size={18}/> Drinks</h4>
-                        <div className="tag-container">
-                            {getItemsByCategory('Drink').length === 0 && <span className="empty-msg">No drinks yet.</span>}
-                            {getItemsByCategory('Drink').map(item => (
-                                <div key={item.id} className="menu-tag" onClick={() => startEditing(item)}>
-                                    {item.name}
-                                    <button onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} className="del-btn"><X size={12}/></button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    ))}
 
                 </div>
             </div>
 
             <style>{`
-                .std-input { padding: 10px; borderRadius: 6px; border: 1px solid #cbd5e1; width: 100%; box-sizing: border-box; }
-                .lbl { display: block; fontSize: 13px; fontWeight: bold; color: #475569; margin-bottom: 5px; }
+                .std-input { padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; width: 100%; box-sizing: border-box; }
+                .lbl { display: block; font-size: 13px; font-weight: bold; color: #475569; margin-bottom: 5px; }
                 .profile-grid { display: grid; gap: 15px; }
                 .city-state-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
                 .input-grid { display: grid; grid-template-columns: 1fr 2fr 60px; gap: 10px; align-items: center; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px dashed #cbd5e1; }
@@ -241,7 +220,7 @@ export default function Settings() {
                     transition: all 0.1s;
                 }
                 .menu-tag:hover { border-color: #3b82f6; color: #3b82f6; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-                .del-btn { background: #fef2f2; border: none; color: #ef4444; width: 20px; height: 20px; border-radius: 50%; display: flex; alignItems: center; justifyContent: center; cursor: pointer; }
+                .del-btn { background: #fef2f2; border: none; color: #ef4444; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
                 .del-btn:hover { background: #fee2e2; }
                 .empty-msg { font-size: 13px; color: #94a3b8; font-style: italic; }
 
