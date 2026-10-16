@@ -44,7 +44,8 @@ export default function Clients() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return alert("Please log in.")
         
-        const newClient = { full_name: 'New Client', email: '', phone: '', address: '', job_price: 0, status: 'lead', service_data: {}, user_id: user.id }
+        // Added city to new client creation
+        const newClient = { full_name: 'New Client', email: '', phone: '', address: '', city: '', job_price: 0, status: 'lead', service_data: {}, user_id: user.id }
         
         const { data, error } = await supabase.from('customers').insert(newClient).select().single()
         
@@ -70,6 +71,7 @@ export default function Clients() {
                 email: selectedClient.email,
                 phone: selectedClient.phone,
                 address: selectedClient.address,
+                city: selectedClient.city, // Saved to database
                 service_data: selectedClient.service_data,
                 job_price: selectedClient.job_price,
                 status: selectedClient.status
@@ -136,7 +138,8 @@ export default function Clients() {
 
     const filteredClients = clients.filter(c => 
         (c.full_name && c.full_name.toLowerCase().includes(search.toLowerCase())) ||
-        (c.address && c.address.toLowerCase().includes(search.toLowerCase()))
+        (c.address && c.address.toLowerCase().includes(search.toLowerCase())) ||
+        (c.city && c.city.toLowerCase().includes(search.toLowerCase()))
     )
 
     return (
@@ -157,8 +160,8 @@ export default function Clients() {
                 <div style={{ flex: 1, overflowY: 'auto' }}>
                     {loading ? <div style={{padding:'20px', color:'#94a3b8'}}>Loading...</div> : filteredClients.map(client => (
                         <div key={client.id} onClick={() => handleSelectClient(client)} style={{ padding: '15px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', background: selectedClient?.id === client.id ? 'white' : 'transparent', borderLeft: selectedClient?.id === client.id ? '4px solid #2563EB' : '4px solid transparent' }}>
-                            {/* FIX: Removed the status line. Just showing Name now. */}
                             <div style={{ fontWeight: 'bold', color: '#334155', fontSize: '15px' }}>{client.full_name}</div>
+                            {client.city && <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>{client.city}</div>}
                         </div>
                     ))}
                 </div>
@@ -185,7 +188,8 @@ export default function Clients() {
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', color: '#64748b', fontSize: '14px' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Mail size={14} /> <input value={selectedClient.email || ''} onChange={e => updateClientState({...selectedClient, email: e.target.value})} placeholder="Email" style={{ border: 'none', width: '100%', outline:'none' }} /></div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Phone size={14} /> <input value={selectedClient.phone || ''} onChange={e => updateClientState({...selectedClient, phone: e.target.value})} placeholder="Phone" style={{ border: 'none', width: '100%', outline:'none' }} /></div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> <input value={selectedClient.address || ''} onChange={e => updateClientState({...selectedClient, address: e.target.value})} placeholder="Address" style={{ border: 'none', width: '100%', outline:'none' }} /></div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> <input value={selectedClient.address || ''} onChange={e => updateClientState({...selectedClient, address: e.target.value})} placeholder="Street Address" style={{ border: 'none', width: '100%', outline:'none' }} /></div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '20px' }}><input value={selectedClient.city || ''} onChange={e => updateClientState({...selectedClient, city: e.target.value})} placeholder="City (e.g. Victorville)" style={{ border: 'none', width: '100%', outline:'none', fontWeight: 'bold' }} /></div>
                                     </div>
                                 </div>
                                 

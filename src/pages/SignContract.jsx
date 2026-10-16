@@ -18,10 +18,13 @@ export default function SignContract() {
     }, [])
 
     async function fetchContract() {
-        const { data: clientData, error } = await supabase.from('customers').select('*').eq('id', id).single()
+        // SECURE FETCH: Uses the RPC bouncer function and the UUID from the URL
+        const { data: clientData, error } = await supabase
+            .rpc('get_contract_by_token', { token: id })
+            .maybeSingle()
         
-        if (error) {
-            setError("Proposal not found or has expired.")
+        if (error || !clientData) {
+            setError("Proposal not found or has expired. Make sure you are using the secure link.") 
             setLoading(false)
             return
         }
@@ -37,19 +40,19 @@ export default function SignContract() {
         
         const timestamp = new Date().toISOString()
         
+        const newServiceData = { 
+            ...client.service_data, 
+            signed_by: signature, 
+            signed_at: timestamp,
+            terms_accepted: true
+        }
+
+        // SECURE SIGN: Uses the RPC bouncer to update ONLY the necessary fields
         const { error } = await supabase
-            .from('customers')
-            .update({
-                status: 'sold', 
-                contract_url: 'SIGNED_DIGITALLY',
-                service_data: { 
-                    ...client.service_data, 
-                    signed_by: signature, 
-                    signed_at: timestamp,
-                    terms_accepted: true
-                }
+            .rpc('sign_contract_by_token', { 
+                token: id,
+                new_service_data: newServiceData
             })
-            .eq('id', id)
 
         if (error) {
             alert("Error signing: " + error.message)
@@ -69,7 +72,6 @@ export default function SignContract() {
         
     const paymentPlan = client.service_data?.payment_plan || []
 
-    // FIX: Using the exact names found in your database
     const entrees = client.service_data?.menu_entrees || []
     const sides = client.service_data?.menu_sides || []
     const drinks = client.service_data?.menu_drinks || []

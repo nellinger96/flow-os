@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Users, Calendar, ArrowRight, DollarSign, Sun, Activity, CheckCircle, Clock, FileText, ChevronDown } from 'lucide-react'
 
 export default function Dashboard() {
     const [user, setUser] = useState(null)
+    const [searchParams, setSearchParams] = useSearchParams() 
     
     // Raw Data State
     const [rawClients, setRawClients] = useState([])
@@ -23,19 +24,55 @@ export default function Dashboard() {
     
     const navigate = useNavigate()
 
+    // --- 1. THE STRIPE CATCHER (NEW) ---
+    // This runs immediately when the page loads to check if Stripe sent us a code
     useEffect(() => {
-        // 1. Get User & Weather
+        const stripeCode = searchParams.get('code')
+        
+        if (stripeCode) {
+            console.log("Caught Stripe Code! Sending to backend...")
+            finishStripeConnection(stripeCode)
+        }
+    }, [searchParams])
+
+    async function finishStripeConnection(code) {
+        try {
+            // Get the current user
+            const { data: { user }, error: userError } = await supabase.auth.getUser()
+            if (userError || !user) throw new Error("No user logged in.")
+
+            // Fire the code and the user_id to your Edge Function!
+            const { data, error } = await supabase.functions.invoke('stripe-connect', {
+                body: { code: code, user_id: user.id }
+            })
+
+            if (error) throw error
+
+            // Success! Clear the code from the URL so it doesn't run again
+            alert("Bank Account Connected Successfully!")
+            setSearchParams({}) 
+            
+            // Optional: send them to the settings page so they see the green "Active" status
+            navigate('/settings')
+
+        } catch (error) {
+            console.error("Stripe Connection Failed:", error)
+            alert("Failed to connect Stripe. Check the console.")
+            setSearchParams({}) 
+        }
+    }
+
+    // --- 2. REGULAR DASHBOARD LOGIC ---
+    useEffect(() => {
         supabase.auth.getUser().then(({ data: { user } }) => {
             if (user) {
                 setUser(user)
                 fetchWeather(user?.user_metadata?.city)
-                // 2. Fetch Data (Only after we have the user)
                 fetchData(user.id)
             }
         })
     }, [])
 
-    // --- 3. RE-CALCULATE REVENUE WHEN FILTER CHANGES ---
     useEffect(() => {
         if (rawClients.length > 0) {
             recalculateRevenue(revenueScope, rawClients)
@@ -43,33 +80,27 @@ export default function Dashboard() {
     }, [revenueScope, rawClients])
 
     async function fetchData(userId) {
-        // SECURITY FIX: We now require userId to run this
         if (!userId) return
 
         const { data: clients } = await supabase
             .from('customers')
             .select('job_price, service_data, status, created_at')
-            .eq('user_id', userId) // <--- CRITICAL SECURITY LOCK ADDED HERE
+            .eq('user_id', userId) 
         
         if (clients) {
-            setRawClients(clients) // Store raw data for filtering later
+            setRawClients(clients) 
 
-            // Standard Metrics (Counts)
             const totalClients = clients.length
             const todayStr = new Date().toISOString().split('T')[0]
             
-            // Check both potential date locations
             const todayCount = clients.filter(c => {
                 const d = c.service_data?.event_date || c.service_data?.service_date
                 return d === todayStr
             }).length
 
-            // Pipeline Counts
             const leads = clients.filter(c => !c.status || c.status === 'lead').length
             const tastings = clients.filter(c => c.status === 'tasting').length
             const proposals = clients.filter(c => c.status === 'proposal').length
-            
-            // Check for 'sold' OR 'booked' since we used both terms recently
             const sold = clients.filter(c => c.status === 'sold' || c.status === 'booked').length
 
             setStats(prev => ({ 
@@ -86,7 +117,6 @@ export default function Dashboard() {
         const startOfYear = new Date(now.getFullYear(), 0, 1)
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
         
-        // Calculate start of week (Sunday)
         const startOfWeek = new Date(now)
         startOfWeek.setDate(now.getDate() - now.getDay())
         startOfWeek.setHours(0,0,0,0)
@@ -94,8 +124,6 @@ export default function Dashboard() {
         const todayStr = now.toISOString().split('T')[0]
 
         const filteredClients = clients.filter(c => {
-            // Use event_date if available, otherwise created_at
-            // Also checking service_date just in case
             const dateStr = c.service_data?.event_date || c.service_data?.service_date || c.created_at
             if (!dateStr) return false
             const date = new Date(dateStr)
@@ -130,13 +158,11 @@ export default function Dashboard() {
         } catch (e) { console.error("Weather error", e) }
     }
 
-    // --- HELPERS ---
     const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
     const hour = new Date().getHours()
     const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
     const businessName = user?.user_metadata?.business_name || 'Partner'
 
-    // Dropdown Labels
     const scopeLabels = {
         'all': 'All Time',
         'year': 'This Year',
@@ -172,12 +198,11 @@ export default function Dashboard() {
             {/* --- METRICS GRID --- */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '30px' }}>
                 
-                {/* 1. REVENUE (WITH TOGGLE) */}
+                {/* 1. REVENUE */}
                 <div style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
                         <div style={{ background: '#dcfce7', padding: '10px', borderRadius: '8px', color: '#16a34a' }}><DollarSign size={24} /></div>
                         
-                        {/* SCOPE TOGGLE BUTTON */}
                         <div style={{position: 'relative'}}>
                             <select 
                                 value={revenueScope}
@@ -241,7 +266,6 @@ export default function Dashboard() {
                     <button onClick={() => navigate('/analytics')} style={{ color: '#64748b', background:'none', border:'none', cursor:'pointer', fontWeight:'bold', fontSize:'13px' }}>View Full Report →</button>
                 </div>
                 
-                {/* FIX: RESPONSIVE GRID (Auto Fit) */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px', marginTop:'10px' }}>
                     <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #94a3b8' }}>
                         <div style={{fontSize:'12px', fontWeight:'bold', color:'#64748b', marginBottom:'5px', display:'flex', alignItems:'center', gap:'5px'}}><Users size={14}/> LEADS</div>

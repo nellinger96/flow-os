@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../supabaseClient' 
-import { Printer, Plus, Trash2, Check, Link, Upload, Eye, X, DollarSign, ChevronDown } from 'lucide-react'
+import { Printer, Plus, Trash2, Check, Link, Upload, Eye, X, DollarSign, ChevronDown, CreditCard, Loader2 } from 'lucide-react'
 
 export default function CateringView({ formData, setFormData, clientId }) {
     const [uploading, setUploading] = useState(false)
+    const [processingPayment, setProcessingPayment] = useState(null)
     const [entreeOptions, setEntreeOptions] = useState([])
     const [sideOptions, setSideOptions] = useState([])
     const [drinkOptions, setDrinkOptions] = useState([])
@@ -60,6 +61,35 @@ export default function CateringView({ formData, setFormData, clientId }) {
         updateService('payment_plan', newPlan)
     }
 
+    // --- STRIPE PAYMENT INTEGRATION ---
+    const handleStripePayment = async (index, amount) => {
+        if (!amount || parseFloat(amount) <= 0) return alert("Enter a valid amount first.")
+        
+        try {
+            setProcessingPayment(index)
+            
+            const { data, error } = await supabase.functions.invoke('create-checkout', {
+                body: {
+                    amount: parseFloat(amount),
+                    description: `Catering Payment #${index + 1}`,
+                    clientName: formData.full_name || 'Client',
+                    returnUrl: window.location.href, 
+                    user_id: formData.user_id 
+                }
+            })
+
+            if (error) throw error
+            if (!data?.url) throw new Error("No payment URL returned")
+
+            window.location.href = data.url
+
+        } catch (error) {
+            console.error(error)
+            alert("Payment Error: " + (error.message || "Could not initialize checkout"))
+            setProcessingPayment(null)
+        }
+    }
+
     const totalCollected = paymentPlan.reduce((sum, item) => item.paid ? sum + (parseFloat(item.amount) || 0) : sum, 0)
     const totalJobPrice = parseFloat(formData.job_price) || 0
     const percentPaid = totalJobPrice > 0 ? Math.min(100, Math.round((totalCollected / totalJobPrice) * 100)) : 0
@@ -85,7 +115,22 @@ export default function CateringView({ formData, setFormData, clientId }) {
     const getStepLabel = (step) => { if (step === 'sold') return 'BOOKED'; return step.charAt(0).toUpperCase() + step.slice(1) }
     const setStatus = (step) => { setFormData(prev => ({ ...prev, status: step })) }
     
-    const copyContractLink = () => { if (!clientId || clientId === 'new') { alert("Please save profile first."); return; } navigator.clipboard.writeText(`${window.location.origin}/sign/${clientId}`); alert("Link Copied!") }
+    // --- UPDATED SECURE LINK COPY ---
+    const copyContractLink = () => { 
+        if (!clientId || clientId === 'new') { 
+            alert("Please save profile first."); 
+            return; 
+        } 
+        
+        const secureToken = formData.public_token;
+        if (!secureToken) {
+            alert("Security token missing! Try refreshing the page or making sure you ran the Supabase SQL.");
+            return;
+        }
+
+        navigator.clipboard.writeText(`${window.location.origin}/sign/${secureToken}`); 
+        alert("Secure Link Copied!"); 
+    }
     
     const handleFileUpload = async (e) => { try { setUploading(true); const file = e.target.files[0]; if(!file)return; if(!clientId || clientId==='new'){alert("Save first");return} const ext=file.name.split('.').pop(); const name=`${clientId}-${Math.random()}.${ext}`; const {error}=await supabase.storage.from('contracts').upload(name, file); if(error)throw error; const {data}=supabase.storage.from('contracts').getPublicUrl(name); setFormData(p=>({...p, contract_url:data.publicUrl})); alert("Uploaded!"); } catch(err){alert(err.message)} finally{setUploading(false)} }
     
@@ -93,7 +138,6 @@ export default function CateringView({ formData, setFormData, clientId }) {
     const updateTimelineItem = (index, field, value) => { const currentTimeline = [...(formData.service_data?.timeline || [])]; currentTimeline[index][field] = value; updateService('timeline', currentTimeline) }
     const removeTimelineItem = (index) => { const currentTimeline = [...(formData.service_data?.timeline || [])]; currentTimeline.splice(index, 1); updateService('timeline', currentTimeline) }
 
-    // --- PRINTER HELPER ---
     const printViaHiddenFrame = (content) => {
         const iframe = document.createElement('iframe');
         iframe.style.position = 'absolute';
@@ -114,7 +158,6 @@ export default function CateringView({ formData, setFormData, clientId }) {
         }, 500);
     }
 
-    // --- PROPOSAL-STYLE INVOICE GENERATOR ---
     const printInvoice = () => {
         try {
             const safeId = String(clientId || 'new')
@@ -128,14 +171,12 @@ export default function CateringView({ formData, setFormData, clientId }) {
             const eventDate = formData.service_data?.event_date ? new Date(formData.service_data.event_date).toLocaleDateString() : 'TBD'
             const eventTime = formData.service_data?.event_time || 'TBD'
             
-            // Build Menu String
             const menuItems = []
             if (entrees.length) menuItems.push(`<strong>Entrees:</strong> ${entrees.join(', ')}`)
             if (sides.length) menuItems.push(`<strong>Sides:</strong> ${sides.join(', ')}`)
             if (drinks.length) menuItems.push(`<strong>Drinks:</strong> ${drinks.join(', ')}`)
             const menuHtml = menuItems.length ? menuItems.join('<br/>') : 'Custom Menu'
 
-            // Build Payment Schedule Rows
             const paymentRowsHtml = paymentPlan.length > 0 ? paymentPlan.map((item, index) => {
                 const dateStr = item.date ? new Date(item.date).toLocaleDateString() : 'TBD'
                 const amountStr = item.amount ? `$${parseFloat(item.amount).toLocaleString(undefined, {minimumFractionDigits: 2})}` : '$0.00'
@@ -154,7 +195,6 @@ export default function CateringView({ formData, setFormData, clientId }) {
                 `
             }).join('') : '<div style="padding: 15px; font-style: italic; color: #94a3b8;">Total due upon receipt.</div>'
 
-
             const content = `
                 <html>
                 <head>
@@ -166,41 +206,29 @@ export default function CateringView({ formData, setFormData, clientId }) {
                         .biz-details { color: #64748b; font-size: 14px; margin-top: 5px; }
                         .invoice-label { font-size: 40px; font-weight: 900; color: #e2e8f0; text-align: right; line-height: 0.8; margin: 0; }
                         .invoice-meta { text-align: right; font-size: 15px; font-weight: bold; color: #334155; margin-top: 10px; }
-                        
                         .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px; }
                         .summary-box { background: #f8fafc; padding: 25px; borderRadius: 12px; border: 1px solid #e2e8f0; }
                         .box-label { font-size: 12px; font-weight: bold; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px; letter-spacing: 0.5px; }
                         .client-name { font-size: 20px; font-weight: bold; color: #1e293b; margin-bottom: 5px; }
                         .info-line { font-size: 14px; color: #475569; margin-bottom: 4px; display: flex; gap: 8px; }
-
                         .table-container { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 30px; }
                         table { width: 100%; border-collapse: collapse; }
                         th { background: #1e3a8a; color: white; text-align: left; padding: 15px; text-transform: uppercase; font-size: 13px; letter-spacing: 0.5px; }
                         td { padding: 18px 15px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
                         .menu-details { font-size: 13px; color: #475569; margin-top: 10px; line-height: 1.6; padding-left: 10px; border-left: 3px solid #cbd5e1; }
-                        
                         .totals-section { display: flex; justify-content: flex-end; margin-bottom: 40px; }
                         .totals-box { width: 300px; }
                         .total-row { display: flex; justify-content: space-between; padding: 10px 0; font-size: 15px; color: #475569; }
                         .grand-total { font-size: 26px; font-weight: 900; color: #1e3a8a; border-top: 3px solid #1e3a8a; padding-top: 15px; margin-top: 10px; }
-
                         .payment-section { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 25px; page-break-inside: avoid; }
                         .footer { margin-top: 50px; text-align: center; font-size: 13px; color: #94a3b8; border-top: 1px solid #eee; padding-top: 30px; }
                     </style>
                 </head>
                 <body>
                     <div class="header">
-                        <div>
-                            <h1 class="biz-title">${businessName}</h1>
-                            <div class="biz-details">${businessCity}</div>
-                        </div>
-                        <div>
-                            <h1 class="invoice-label">INVOICE</h1>
-                            <div class="invoice-meta">#${invoiceNum}</div>
-                            <div class="invoice-meta">Issued: ${today}</div>
-                        </div>
+                        <div><h1 class="biz-title">${businessName}</h1><div class="biz-details">${businessCity}</div></div>
+                        <div><h1 class="invoice-label">INVOICE</h1><div class="invoice-meta">#${invoiceNum}</div><div class="invoice-meta">Issued: ${today}</div></div>
                     </div>
-
                     <div class="summary-grid">
                         <div class="summary-box">
                             <div class="box-label">Bill To</div>
@@ -216,7 +244,6 @@ export default function CateringView({ formData, setFormData, clientId }) {
                             <div class="info-line"><strong>Guest Count:</strong> ${guests}</div>
                         </div>
                     </div>
-
                     <div class="table-container">
                         <table>
                             <thead><tr><th width="55%">Description</th><th width="15%">Guests</th><th width="15%">Rate</th><th width="15%" style="text-align:right">Amount</th></tr></thead>
@@ -224,9 +251,7 @@ export default function CateringView({ formData, setFormData, clientId }) {
                                 <tr>
                                     <td>
                                         <strong style="font-size: 16px; color: #1e293b;">Catering Service Package</strong>
-                                        <div class="menu-details">
-                                            ${menuHtml}
-                                        </div>
+                                        <div class="menu-details">${menuHtml}</div>
                                         ${formData.job_notes ? `<div style="margin-top: 15px; font-size: 13px; color: #64748b;"><strong>Notes:</strong> ${formData.job_notes}</div>` : ''}
                                     </td>
                                     <td style="font-size: 15px; font-weight: bold;">${guests}</td>
@@ -236,30 +261,19 @@ export default function CateringView({ formData, setFormData, clientId }) {
                             </tbody>
                         </table>
                     </div>
-
                     <div class="totals-section">
                         <div class="totals-box">
                             <div class="total-row"><span>Subtotal</span><span>$${total.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>
                             <div class="total-row grand-total"><span>Total</span><span>$${total.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>
                         </div>
                     </div>
-
                     <div class="payment-section">
                          <div class="box-label" style="margin-bottom: 20px;">Payment Schedule & Terms</div>
                          ${paymentRowsHtml}
-                         <div class="total-row" style="margin-top: 20px; border-top: 2px solid #e2e8f0; padding-top: 15px; font-weight: bold;">
-                            <span>Total Paid</span>
-                            <span style="color: #166534;">$${totalCollected.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
-                        </div>
-                         <div class="total-row" style="font-size: 18px; font-weight: 900; color: #dc2626;">
-                            <span>Balance Due</span>
-                            <span>$${balanceDue.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
-                        </div>
+                         <div class="total-row" style="margin-top: 20px; border-top: 2px solid #e2e8f0; padding-top: 15px; font-weight: bold;"><span>Total Paid</span><span style="color: #166534;">$${totalCollected.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>
+                         <div class="total-row" style="font-size: 18px; font-weight: 900; color: #dc2626;"><span>Balance Due</span><span>$${balanceDue.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>
                     </div>
-
-                    <div class="footer">
-                        Thank you for your business. Please make checks payable to ${businessName}.
-                    </div>
+                    <div class="footer">Thank you for your business. Please make checks payable to ${businessName}.</div>
                 </body>
                 </html>
             `
@@ -415,7 +429,7 @@ export default function CateringView({ formData, setFormData, clientId }) {
                 </div>
             </div>
 
-            {/* PAYMENT SCHEDULE */}
+            {/* PAYMENT SCHEDULE (WITH STRIPE BUTTONS) */}
             <div style={sectionStyle}>
                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'15px'}}>
                     <h4 style={{margin:0, color: '#334155', display:'flex', alignItems:'center', gap:'8px'}}>Payment Schedule</h4>
@@ -438,7 +452,21 @@ export default function CateringView({ formData, setFormData, clientId }) {
                         <div style={{width:'30px', fontWeight:'bold', color:'#94a3b8', fontSize:'13px'}}>#{index + 1}</div>
                         <div style={{flex:1}}><input type="date" value={item.date} onChange={e => updatePayment(index, 'date', e.target.value)} style={inputStyle} /></div>
                         <div style={{flex:1, position:'relative'}}><span style={{position:'absolute', left:'10px', top:'10px', color:'#94a3b8'}}>$</span><input type="number" value={item.amount} onChange={e => updatePayment(index, 'amount', e.target.value)} style={{...inputStyle, paddingLeft:'20px'}} /></div>
+                        
+                        {/* MANUAL TOGGLE (Checkbox) */}
                         <div onClick={() => updatePayment(index, 'paid', !item.paid)} style={{cursor:'pointer', padding:'8px 12px', borderRadius:'6px', background: item.paid ? '#dcfce7' : '#f1f5f9', color: item.paid ? '#16a34a' : '#94a3b8', border: `1px solid ${item.paid ? '#bbf7d0' : '#e2e8f0'}`, display:'flex', alignItems:'center', gap:'6px', fontWeight:'bold', fontSize:'13px', minWidth:'80px', justifyContent:'center'}}>{item.paid ? <><Check size={14}/> Paid</> : 'Unpaid'}</div>
+                        
+                        {/* STRIPE PAY BUTTON (Only show if UNPAID and has amount) */}
+                        {!item.paid && parseFloat(item.amount) > 0 && (
+                            <button 
+                                onClick={() => handleStripePayment(index, item.amount)} 
+                                disabled={processingPayment !== null}
+                                style={{ background: '#2563EB', color: 'white', border: 'none', borderRadius: '6px', padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                title="Pay Online with Stripe"
+                            >
+                                {processingPayment === index ? <Loader2 className="spin" size={16} /> : <CreditCard size={16} />}
+                            </button>
+                        )}
                     </div>
                 ))}
             </div>

@@ -4,6 +4,8 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-route
 import { Menu } from 'lucide-react'
 
 // --- PAGE IMPORTS ---
+import LandingPage from './pages/LandingPage' // NEW
+import Signup from './pages/Signup' // NEW
 import Dashboard from './pages/Dashboard'
 import Calendar from './pages/Calendar'
 import Tracker from './pages/Tracker'
@@ -16,9 +18,11 @@ import Settings from './pages/Settings'
 import SignContract from './pages/SignContract'
 import Privacy from './pages/Privacy'
 import Terms from './pages/Terms'
+import StripeCallback from './pages/StripeCallback'
 
 // --- COMPONENT IMPORTS ---
 import Sidebar from './components/Sidebar'
+import SubscriptionGate from './components/SubscriptionGate' // NEW
 
 // --- TOP BAR COMPONENT ---
 function TopBar({ onOpenMenu }) {
@@ -79,19 +83,26 @@ function App() {
 
   if (loading) return null
 
-  // --- PUBLIC / LOGIN FLOW ---
+  // --- PUBLIC / VISITOR FLOW (Not Logged In) ---
   if (!session) {
     return (
         <Router>
             <Routes>
-                {/* PUBLIC ROUTES (No Login Required) */}
+                {/* 1. LANDING PAGE (Root) */}
+                <Route path="/" element={<LandingPage />} />
+                
+                {/* 2. AUTH PAGES */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+
+                {/* 3. PUBLIC LEGAL/CONTRACT PAGES */}
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/sign/:id" element={<SignContract />} />
                 <Route path="/update-password" element={<UpdatePassword />} />
                 
-                {/* Catch-all sends to Login */}
-                <Route path="*" element={<Login />} />
+                {/* Catch-all redirects to Landing Page instead of Login */}
+                <Route path="*" element={<LandingPage />} />
             </Routes>
         </Router>
     )
@@ -115,21 +126,24 @@ function App() {
             backgroundColor: '#f8fafc'
         }}>
             <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/dashboard" element={<Dashboard />} />
+                {/* --- PROTECTED ROUTES (Must Pay to Enter) --- */}
+                <Route path="/" element={<SubscriptionGate><Dashboard /></SubscriptionGate>} />
+                <Route path="/dashboard" element={<SubscriptionGate><Dashboard /></SubscriptionGate>} />
                 
-                <Route path="/calendar" element={<Calendar />} />
-                <Route path="/map" element={<Tracker />} />
-                <Route path="/analytics" element={<Analytics />} />
-                <Route path="/clients" element={<Clients />} />
-                <Route path="/invoices" element={<Invoices />} />
-                <Route path="/settings" element={<Settings />} />
+                <Route path="/calendar" element={<SubscriptionGate><Calendar /></SubscriptionGate>} />
+                <Route path="/map" element={<SubscriptionGate><Tracker /></SubscriptionGate>} />
+                <Route path="/analytics" element={<SubscriptionGate><Analytics /></SubscriptionGate>} />
+                <Route path="/clients" element={<SubscriptionGate><Clients /></SubscriptionGate>} />
+                <Route path="/invoices" element={<SubscriptionGate><Invoices /></SubscriptionGate>} />
+                <Route path="/settings" element={<SubscriptionGate><Settings /></SubscriptionGate>} />
+
+                {/* --- PUBLIC ACCESS INSIDE APP (No Paywall) --- */}
+                {/* Users need to access these even if subscription is expired */}
+                <Route path="/stripe-callback" element={<StripeCallback />} />
                 <Route path="/sign/:id" element={<SignContract />} />
-                <Route path="/update-password" element={<UpdatePassword />} />
-                
-                {/* Legal Pages (Also accessible inside) */}
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
+                <Route path="/update-password" element={<UpdatePassword />} />
             </Routes>
         </div>
     </Router>
