@@ -1,3 +1,9 @@
+# Local development only (avoids clashing with other local Supabase projects)
+[db]
+port = 54422
+shadow_port = 54420
+major_version = 17
+
 
 [functions.grocery-ai]
 enabled = true
