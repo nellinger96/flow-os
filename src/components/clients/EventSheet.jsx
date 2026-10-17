@@ -21,10 +21,14 @@ export default function EventSheet({ client, setClient }) {
                     <input type="time" value={sd.event_time || ''} onChange={e => update({ event_time: e.target.value })} className={`${inputClass} text-base`} />
                 </label>
                 <label className="block">
-                    <Label>{t('event.guests')}</Label>
-                    <input type="number" min="0" inputMode="numeric" value={sd.guest_count ?? ''} onChange={e => update({ guest_count: e.target.value })} className={`${inputClass} text-base font-bold`} />
+                    <Label>{t('event.endTime')}</Label>
+                    <input type="time" value={sd.event_end_time || ''} onChange={e => update({ event_end_time: e.target.value })} className={`${inputClass} text-base`} />
                 </label>
             </div>
+            <label className="block">
+                <Label>{t('event.guests')}</Label>
+                <input type="number" min="0" inputMode="numeric" value={sd.guest_count ?? ''} onChange={e => update({ guest_count: e.target.value })} className={`${inputClass} text-base font-bold`} />
+            </label>
             <label className="block">
                 <Label>{t('event.pricePerPerson')}</Label>
                 <div className="relative">

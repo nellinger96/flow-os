@@ -5,7 +5,7 @@ import {
     AlertTriangle, ArrowLeft, CalendarDays, Check, ChevronRight, CreditCard, FileSignature, Loader2,
     MapPin, MessageSquare, MoreHorizontal, NotebookPen, Pencil, Phone, Printer, ShoppingBag, Trash2, Truck, UtensilsCrossed,
 } from 'lucide-react'
-import { dialable, formatDate, formatTime, money, toNumber } from '../../lib/format'
+import { dialable, formatDate, formatTimeRange, money, toNumber } from '../../lib/format'
 import { selectedMenu } from '../../lib/menu'
 import { PIPELINE } from '../../lib/status'
 import { invoiceHtml, kitchenSheetHtml, printHtml } from '../../lib/printDocs'
@@ -123,7 +123,7 @@ export default function ClientDetail({
     }
     const active = sheet && sheets[sheet]
 
-    const eventLine = [formatDate(sd.event_date, lng, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }), formatTime(sd.event_time, lng)].filter(Boolean).join(' · ')
+    const eventLine = [formatDate(sd.event_date, lng, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }), formatTimeRange(sd.event_time, sd.event_end_time, lng)].filter(Boolean).join(' · ')
     const placeLine = [client.city, sd.guest_count ? t('clients.guestsShort', { count: Number(sd.guest_count) }) : null].filter(Boolean).join(' · ')
 
     let paymentsLine = t('summary.noPayments')
@@ -163,7 +163,7 @@ export default function ClientDetail({
                                             [ShoppingBag, t('clients.groceryList'), onGrocery],
                                             ...(sd.event_date ? [[Truck, t('loadout.checklistForEvent'), () => {
                                                 if (dirty && !window.confirm(t('clients.discardChanges'))) return
-                                                navigate(`/loadout?date=${String(sd.event_date).slice(0, 10)}`)
+                                                navigate(`/day?date=${String(sd.event_date).slice(0, 10)}&tab=loadout`)
                                             }]] : []),
                                         ].map(([Icon, label, action]) => (
                                             <button key={label} onClick={() => { setMenuOpen(false); action() }} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 active:bg-slate-50 md:hover:bg-slate-50">

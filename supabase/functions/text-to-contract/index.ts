@@ -69,6 +69,7 @@ function normalizeParsedEvent(parsed: any) {
     city: parsed.city ?? null,
     event_date: parsed.event_date ?? null,
     event_time: parsed.event_time ?? null,
+    event_end_time: parsed.event_end_time ?? null,
     guest_count: parsed.guest_count ?? null,
     menu_entrees: Array.isArray(parsed.menu_entrees) ? parsed.menu_entrees : [],
     menu_sides: Array.isArray(parsed.menu_sides) ? parsed.menu_sides : [],
@@ -114,6 +115,7 @@ Return this exact JSON shape:
   "city": string | null,
   "event_date": "YYYY-MM-DD" | null,
   "event_time": "HH:MM" | null,
+  "event_end_time": "HH:MM" | null,
   "guest_count": number | null,
   "menu_entrees": string[],
   "menu_sides": string[],
@@ -126,6 +128,7 @@ Return this exact JSON shape:
 
 Rules:
 - event_time must be 24-hour format, like "16:00".
+- event_end_time is when service ends, 24-hour format. "de 4 a 8" or "4-8pm" means event_time "16:00" and event_end_time "20:00". If only a length is given ("4 horas de servicio"), add it to event_time. Otherwise null.
 - Put tacos, birria, pasta, meats, main foods, bar packages, desserts, dessert carts, and primary services in menu_entrees.
 - Put rice, beans, salads, sides, toppings, garnishes, cups, plates, and setup notes in menu_sides only if they are clearly part of the order.
 - Put aguas frescas, soda, drinks, cocktails, mocktails, beer, wine, and bar drinks in menu_drinks.
@@ -273,6 +276,7 @@ serve(async (req) => {
     const serviceData = {
       event_date: parsed.event_date || "",
       event_time: parsed.event_time || "",
+      event_end_time: parsed.event_end_time || "",
       guest_count: guestCount || "",
       price_per_head: pricePerHead,
       menu_entrees: parsed.menu_entrees || [],
@@ -331,7 +335,7 @@ serve(async (req) => {
       `Contrato creado ✅\n\n` +
       `Cliente: ${parsed.client_name || "New Client"}\n` +
       `Fecha: ${parsed.event_date || "TBD"}\n` +
-      `Hora: ${parsed.event_time || "TBD"}\n` +
+      `Hora: ${parsed.event_time || "TBD"}${parsed.event_end_time ? ` a ${parsed.event_end_time}` : ""}\n` +
       `Personas: ${guestCount || "TBD"}\n` +
       `Total: $${totalPrice || 0}\n` +
       `Depósito: $${deposit || 0}\n` +

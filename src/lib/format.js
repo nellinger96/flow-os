@@ -64,3 +64,11 @@ export function dialable(phone) {
     const m = String(phone || '').match(/(\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/)
     return m ? m[0].replace(/[^\d+]/g, '') : ''
 }
+
+// "15:00", "19:30" -> "3:00 PM – 7:30 PM" (just the start when there's no end)
+export function formatTimeRange(start, end, lng) {
+    const a = formatTime(start, lng)
+    const b = formatTime(end, lng)
+    if (a && b) return `${a} – ${b}`
+    return a || (b ? `– ${b}` : '')
+}

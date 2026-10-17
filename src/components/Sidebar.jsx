@@ -26,7 +26,7 @@ export default function Sidebar({ isOpen, onClose, onLogout }) {
     const menuItems = [
         { label: t('nav.dashboard'), path: '/', icon: <Home size={20} /> },
         { label: t('nav.calendar'), path: '/calendar', icon: <Calendar size={20} /> },
-        { label: t('nav.loadout'), path: '/loadout', icon: <Truck size={20} /> },
+        { label: t('nav.eventDay'), path: '/day', icon: <Truck size={20} /> },
         { label: t('nav.directory'), path: '/clients', icon: <Users size={20} /> },
         { label: t('nav.invoices'), path: '/invoices', icon: <FileText size={20} /> },
         { label: t('nav.analytics'), path: '/analytics', icon: <BarChart3 size={20} /> },

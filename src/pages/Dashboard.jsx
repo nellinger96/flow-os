@@ -6,7 +6,7 @@ import {
     AlertTriangle, CalendarDays, CalendarPlus, CheckCircle2, ChevronRight, Clock, DollarSign, FileSignature,
     Loader2, MapPin, Phone, Printer, Truck, UserPlus, Users, UserRound,
 } from 'lucide-react'
-import { dialable, formatDate, formatTime, money, parseLocalDate, toNumber, todayISO } from '../lib/format'
+import { dialable, formatDate, formatTimeRange, money, parseLocalDate, toNumber, todayISO } from '../lib/format'
 import { isoDay, paymentSummary } from '../lib/payments'
 import { createLead } from '../lib/clients'
 import { ALL_MENU_FIELDS } from '../lib/menu'
@@ -74,7 +74,7 @@ function EventBlock({ client, today, big, onOpen, onLoadout }) {
             </div>
             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
                 {big && date && <span className="flex items-center gap-1.5"><CalendarDays size={14} />{formatDate(date, lng, { weekday: 'short', month: 'short', day: 'numeric' })}</span>}
-                <span className="flex items-center gap-1.5"><Clock size={14} />{formatTime(sd.event_time, lng) || t('calendar.noTime')}</span>
+                <span className="flex items-center gap-1.5"><Clock size={14} />{formatTimeRange(sd.event_time, sd.event_end_time, lng) || t('calendar.noTime')}</span>
                 {guests > 0 && <span className="flex items-center gap-1.5"><Users size={14} />{t('clients.guestsShort', { count: guests })}</span>}
                 {client.city && <span className="flex items-center gap-1.5"><MapPin size={14} />{client.city}</span>}
             </div>
@@ -86,7 +86,7 @@ function EventBlock({ client, today, big, onOpen, onLoadout }) {
             <div className="mt-3 flex flex-wrap gap-2">
                 {place && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`} target="_blank" rel="noreferrer" className={`${btn} bg-blue-50 text-blue-700 hover:bg-blue-100`}><MapPin size={15} />{t('summary.map')}</a>}
                 {phone && <a href={`tel:${phone}`} className={`${btn} bg-blue-50 text-blue-700 hover:bg-blue-100`}><Phone size={15} />{t('summary.call')}</a>}
-                <button onClick={onLoadout} className={`${btn} bg-blue-50 text-blue-700 hover:bg-blue-100`}><Truck size={15} />{t('nav.loadout')}</button>
+                <button onClick={onLoadout} className={`${btn} bg-blue-50 text-blue-700 hover:bg-blue-100`}><Truck size={15} />{t('nav.eventDay')}</button>
                 <button onClick={() => printHtml(kitchenSheetHtml({ client, t, lng }))} className={`${btn} bg-blue-50 text-blue-700 hover:bg-blue-100`}><Printer size={15} />{t('calendar.kitchen')}</button>
                 <button onClick={onOpen} className={`${btn} bg-slate-900 text-white hover:bg-slate-700`}>{t('calendar.openClient')}</button>
             </div>
@@ -209,6 +209,7 @@ export default function Dashboard() {
                 if (!ALL_MENU_FIELDS.some(f => Array.isArray(sd[f]) && sd[f].length)) missing.push(t('home.missing.menu'))
                 if (!toNumber(sd.guest_count)) missing.push(t('home.missing.guests'))
                 if (!sd.event_time) missing.push(t('home.missing.time'))
+                if (!sd.event_end_time) missing.push(t('home.missing.endTime'))
                 if (!r.client.address?.trim()) missing.push(t('home.missing.address'))
                 if (toNumber(r.client.job_price) > 0 && !(sd.payment_plan || []).length) missing.push(t('home.missing.schedule'))
                 if (!r.client.contract_url) missing.push(t('home.missing.contract'))
@@ -298,12 +299,12 @@ export default function Dashboard() {
                             <Card title={d.todayEvents.length ? t('home.todayTitle', { count: d.todayEvents.length }) : t('home.nextUp')} action={<LinkButton onClick={() => navigate('/calendar')}>{t('nav.calendar')}</LinkButton>}>
                                 {d.todayEvents.length > 0 ? (
                                     <div className="divide-y divide-slate-100 pb-1">
-                                        {d.todayEvents.map(r => <EventBlock key={r.client.id} client={r.client} today={today} onOpen={() => openClient(r.client.id)} onLoadout={() => navigate(`/loadout?date=${r.date}`)} />)}
+                                        {d.todayEvents.map(r => <EventBlock key={r.client.id} client={r.client} today={today} onOpen={() => openClient(r.client.id)} onLoadout={() => navigate(`/day?date=${r.date}`)} />)}
                                     </div>
                                 ) : d.nextUp ? (
                                     <>
                                         <div className="px-4 text-sm text-slate-500 md:px-5">{t('home.noEventsToday')}</div>
-                                        <EventBlock client={d.nextUp.client} today={today} big onOpen={() => openClient(d.nextUp.client.id)} onLoadout={() => navigate(`/loadout?date=${d.nextUp.date}`)} />
+                                        <EventBlock client={d.nextUp.client} today={today} big onOpen={() => openClient(d.nextUp.client.id)} onLoadout={() => navigate(`/day?date=${d.nextUp.date}`)} />
                                     </>
                                 ) : (
                                     <div className="px-5 pb-6 pt-2 text-slate-500">{t('home.nothingUpcoming')}</div>

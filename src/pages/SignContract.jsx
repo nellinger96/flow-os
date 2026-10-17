@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { menuSections } from '../lib/menu'
 import { CONTRACT_TERMS, CURRENT_TERMS_VERSION } from '../lib/contractTerms'
 import { contractHtml, printHtml } from '../lib/printDocs'
+import { formatTimeRange } from '../lib/format'
 
 const MENU_TITLES = { Entree: 'Entrees', Side: 'Sides', Drink: 'Drinks', Dessert: 'Desserts', Supplies: 'Supplies & Equipment' }
 
@@ -126,7 +127,7 @@ export default function SignContract() {
                             <Calendar size={16} /> {eventDate}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.1)', padding: '8px 15px', borderRadius: '20px', fontSize: '14px' }}>
-                            <Clock size={16} /> {client.service_data?.event_time || 'TBD'}
+                            <Clock size={16} /> {formatTimeRange(client.service_data?.event_time, client.service_data?.event_end_time, i18n.language) || 'TBD'}
                         </div>
                     </div>
                 </div>

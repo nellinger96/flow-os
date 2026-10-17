@@ -175,7 +175,7 @@ export default function Equipment() {
     return (
         <div className="min-h-[calc(100vh-60px)] bg-slate-50 font-sans">
             <div className="mx-auto max-w-3xl px-4 py-5 md:py-8">
-                <button onClick={() => navigate('/loadout')} className="-ml-2 mb-2 flex items-center gap-1 rounded-lg p-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">
+                <button onClick={() => navigate('/day?tab=loadout')} className="-ml-2 mb-2 flex items-center gap-1 rounded-lg p-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">
                     <ArrowLeft size={18} />{t('loadout.title')}
                 </button>
                 <h1 className="text-2xl font-extrabold text-slate-900">{t('loadout.equipment')}</h1>

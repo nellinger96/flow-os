@@ -1,4 +1,4 @@
-import { escapeHtml as esc, formatDate, formatDateTime, formatTime, money, toNumber, todayISO } from './format'
+import { escapeHtml as esc, formatDate, formatDateTime, formatTime, formatTimeRange, money, toNumber, todayISO } from './format'
 import { menuSections } from './menu'
 import { CONTRACT_TERMS, CURRENT_TERMS_VERSION } from './contractTerms'
 
@@ -68,7 +68,7 @@ function eventBox(c, t, lng) {
     const sd = c.service_data || {}
     return `<div class="box"><div class="label">${esc(t('doc.eventDetails'))}</div>
       <div><strong>${esc(t('doc.date'))}:</strong> ${esc(formatDate(sd.event_date, lng, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) || t('common.tbd'))}</div>
-      <div><strong>${esc(t('doc.time'))}:</strong> ${esc(formatTime(sd.event_time, lng) || t('common.tbd'))}</div>
+      <div><strong>${esc(t('doc.time'))}:</strong> ${esc(formatTimeRange(sd.event_time, sd.event_end_time, lng) || t('common.tbd'))}</div>
       <div><strong>${esc(t('doc.guests'))}:</strong> ${esc(sd.guest_count || 0)}</div>
     </div>`
 }
@@ -115,7 +115,7 @@ export function kitchenSheetHtml({ client, t, lng }) {
       <div class="section box" style="font-size:18px">
         <div><strong>${esc(t('doc.client'))}:</strong> ${esc(client.full_name)}</div>
         <div><strong>${esc(t('doc.guests'))}:</strong> ${esc(sd.guest_count || 0)}</div>
-        <div><strong>${esc(t('doc.time'))}:</strong> ${esc(formatTime(sd.event_time, lng) || t('common.tbd'))}</div>
+        <div><strong>${esc(t('doc.time'))}:</strong> ${esc(formatTimeRange(sd.event_time, sd.event_end_time, lng) || t('common.tbd'))}</div>
         <div><strong>${esc(t('doc.location'))}:</strong> ${esc(client.address || '')}</div>
       </div>
       <div class="section" style="font-size:17px">${menuHtml(sd, t)}</div>
@@ -189,7 +189,7 @@ export function loadoutHtml({ day, events, t, lng }) {
         return `<div class="event">
           <div class="header" style="margin-bottom:8px">
             <div><div class="biz" style="color:#0f172a">${esc(client.full_name)}</div>
-              <div class="muted">${esc(formatDate(day, lng, { weekday: 'long', month: 'long', day: 'numeric' }))} · ${esc(formatTime(sd.event_time, lng) || t('common.tbd'))} · ${esc(t('clients.guestsShort', { count: toNumber(sd.guest_count) }))}</div>
+              <div class="muted">${esc(formatDate(day, lng, { weekday: 'long', month: 'long', day: 'numeric' }))} · ${esc(formatTimeRange(sd.event_time, sd.event_end_time, lng) || t('common.tbd'))} · ${esc(t('clients.guestsShort', { count: toNumber(sd.guest_count) }))}</div>
               <div class="muted">${esc(place)}</div></div>
             <div class="doc-title">${esc(t('loadout.title'))}</div>
           </div>
@@ -199,4 +199,41 @@ export function loadoutHtml({ day, events, t, lng }) {
         </div>`
     }).join('')
     return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(t('loadout.title'))}</title><style>${BASE_CSS}${css}</style></head><body>${body}</body></html>`
+}
+
+// Run sheet for a day: one section per truck with leave / arrive / service times
+export function runSheetHtml({ day, sheet, t, lng }) {
+    const fmt = (m) => {
+        if (m === null || m === undefined) return '—'
+        const d = new Date(2000, 0, 1, 0, 0)
+        d.setMinutes(m)
+        return d.toLocaleTimeString(lng === 'es' ? 'es-MX' : 'en-US', { hour: 'numeric', minute: '2-digit' })
+    }
+    const css = `
+      .truck { page-break-after: always; }
+      .truck:last-child { page-break-after: auto; }
+      table { width: 100%; border-collapse: collapse; font-size: 15px; margin-top: 10px; }
+      th { text-align: left; font-size: 11px; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #0f172a; padding: 6px 4px; }
+      td { border-bottom: 1px solid #e2e8f0; padding: 9px 4px; vertical-align: top; }
+      .t { font-weight: 900; white-space: nowrap; }
+      .late { color: #dc2626; font-weight: bold; font-size: 13px; }`
+    const lanes = sheet.lanes.filter(l => l.stops.length)
+    const body = lanes.map(({ truck, stops }) => `<div class="truck">
+        <div class="header" style="margin-bottom:6px">
+          <div><div class="biz" style="color:#0f172a">${esc(truck.name)}</div>
+            <div class="muted">${esc(formatDate(day, lng, { weekday: 'long', month: 'long', day: 'numeric' }))}</div>
+            ${sheet.settings.kitchen_address ? `<div class="muted">${esc(t('day.kitchen'))}: ${esc(sheet.settings.kitchen_address)}</div>` : ''}</div>
+          <div class="doc-title">${esc(t('day.tabSchedule'))}</div>
+        </div>
+        <table><thead><tr><th>${esc(t('day.leaveBy'))}</th><th>${esc(t('day.arriveBy'))}</th><th>${esc(t('day.service'))}</th><th>${esc(t('doc.client'))}</th></tr></thead><tbody>
+        ${stops.map(s => `<tr>
+            <td class="t">${esc(fmt(s.leaveBy))}</td><td class="t">${esc(fmt(s.arriveBy))}</td><td class="t">${esc(fmt(s.service))}</td>
+            <td><strong>${esc(s.client.full_name)}</strong> · ${esc(t('clients.guestsShort', { count: toNumber(s.client.service_data?.guest_count) }))}
+              <div class="muted">${esc([s.client.address, s.client.city].filter(Boolean).join(', '))}</div>
+              ${s.client.service_data?.setup?.table_covers ? `<div><strong>${esc(t('loadout.setup.table_covers'))}:</strong> ${esc(s.client.service_data.setup.table_covers)}</div>` : ''}
+              ${s.lateBy > 0 ? `<div class="late">${esc(t('day.cantMakeIt', { count: s.lateBy }))}</div>` : ''}</td>
+          </tr>`).join('')}
+        </tbody></table></div>`).join('')
+    const empty = `<div class="muted">${esc(t('day.nothingAssigned'))}</div>`
+    return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(t('day.tabSchedule'))}</title><style>${BASE_CSS}${css}</style></head><body>${body || empty}</body></html>`
 }

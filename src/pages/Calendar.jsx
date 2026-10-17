@@ -6,7 +6,7 @@ import {
     MapPin, MessageSquare, Phone, Plus, Printer, ShoppingBag, Truck, Users,
 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { dialable, formatDate, formatTime, money, toNumber, todayISO } from '../lib/format'
+import { dialable, formatDate, formatTime, formatTimeRange, money, toNumber, todayISO } from '../lib/format'
 import { PIPELINE } from '../lib/status'
 import { isoDay as isoDate, paymentSummary } from '../lib/payments'
 import { createLead } from '../lib/clients'
@@ -75,7 +75,7 @@ function EventCard({ entry, onOpen, onMove, onGrocery }) {
             <div className="mt-1 space-y-0.5 text-sm text-slate-600">
                 <div className="flex items-center gap-1.5">
                     <Clock size={14} className="shrink-0" />
-                    {formatTime(sd.event_time, lng) || t('calendar.noTime')}
+                    {formatTimeRange(sd.event_time, sd.event_end_time, lng) || t('calendar.noTime')}
                     {guests > 0 && <> · {t('clients.guestsShort', { count: guests })}</>}
                 </div>
                 {place && <div className="flex items-center gap-1.5"><MapPin size={14} className="shrink-0" /><span className="truncate">{place}</span></div>}
@@ -474,9 +474,9 @@ export default function CalendarPage() {
                             </div>
                         )}
                         {panel.events.some(e => e.status === 'sold') && (
-                            <button onClick={() => navigate(`/loadout?date=${openDay}`)} className="flex w-full items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-3 text-left text-blue-800 hover:bg-blue-100">
+                            <button onClick={() => navigate(`/day?date=${openDay}`)} className="flex w-full items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-3 text-left text-blue-800 hover:bg-blue-100">
                                 <Truck size={20} className="shrink-0" />
-                                <span className="flex-1 font-bold">{t('loadout.checklistForDay')}</span>
+                                <span className="flex-1 font-bold">{t('day.planForDay')}</span>
                                 <ChevronRight size={18} />
                             </button>
                         )}

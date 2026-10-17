@@ -27,7 +27,8 @@
     "businessAnalytics": "Reportes del negocio",
     "businessSettings": "Configuración del negocio",
     "digitalContract": "Contrato digital",
-    "loadout": "Carga"
+    "loadout": "Carga",
+    "eventDay": "Día de evento"
   },
   "status": {
     "lead": "Prospecto",
@@ -73,7 +74,7 @@
   },
   "event": {
     "date": "Fecha del evento",
-    "time": "Hora del servicio",
+    "time": "Hora de inicio",
     "guests": "Personas",
     "pricePerPerson": "Precio por persona",
     "total": "Total",
@@ -91,7 +92,8 @@
     "noTimeline": "Sin horario todavía.",
     "activity": "Actividad",
     "printKitchenSheet": "Hoja de cocina",
-    "printInvoice": "Factura"
+    "printInvoice": "Factura",
+    "endTime": "Hora de término"
   },
   "menu": {
     "search": "Buscar en tu menú…",
@@ -319,7 +321,8 @@
       "time": "hora",
       "address": "dirección",
       "schedule": "plan de pagos",
-      "contract": "contrato"
+      "contract": "contrato",
+      "endTime": "hora de término"
     }
   },
   "loadout": {
@@ -475,6 +478,91 @@
     "namePlaceholder": "Tu nombre",
     "start": "Empezar",
     "hi": "Hola {{name}}",
-    "notYou": "¿No eres tú?"
+    "notYou": "¿No eres tú?",
+    "contract": "Contrato",
+    "contractSigned": "Firmado por {{name}} · {{date}}",
+    "contractNotSigned": "El contrato aún no está firmado",
+    "terms": "Términos y condiciones",
+    "pricesHidden": "Los precios y pagos están ocultos para el equipo."
+  },
+  "day": {
+    "tabSchedule": "Horario",
+    "tabLoadout": "Carga",
+    "tabRoute": "Ruta",
+    "shareShort": "Enlace",
+    "trucksTimes": "Camiones y tiempos",
+    "setupTrucksTitle": "Agrega tus camiones y la dirección de tu cocina",
+    "setupTrucksBody": "Luego asigna cada evento a un camión para ver a qué hora salir y avisos cuando un camión no alcanza a llegar.",
+    "problemsBanner_one": "1 parada no se alcanza a tiempo. Pásala a otro camión o ajusta los tiempos.",
+    "problemsBanner_other": "{{count}} paradas no se alcanzan a tiempo. Pásalas a otro camión o ajusta los tiempos.",
+    "unassigned_one": "1 evento necesita camión",
+    "unassigned_other": "{{count}} eventos necesitan camión",
+    "shareTruck": "Enlace para {{name}}",
+    "shareMessage": "{{who}} – {{date}}. Tus paradas y lista de carga: {{url}}",
+    "allTrucks": "Todos los camiones",
+    "shareExplainTruck": "El equipo de {{name}} solo ve sus paradas del {{date}}: hora de salida, direcciones, botones de Saliendo / Llegamos / Montaje listo y su lista de carga. Sin cuenta y sin precios.",
+    "planForDay": "Horario y carga de este día",
+    "nothingAssigned": "Todavía no hay eventos asignados a un camión.",
+    "kitchen": "Cocina",
+    "prevStop": "la parada anterior",
+    "driveFrom_one": "{{count}} min de camino desde {{from}}",
+    "driveFrom_other": "{{count}} min de camino desde {{from}}",
+    "checkMaps": "Ver en Maps",
+    "cantMakeIt_one": "No se alcanza: el camión llegaría {{count}} min tarde desde la parada anterior.",
+    "cantMakeIt_other": "No se alcanza: el camión llegaría {{count}} min tarde desde la parada anterior.",
+    "noTime": "Sin hora de inicio. Agrégala para programar esta parada.",
+    "leaveBy": "Salir a las",
+    "arriveBy": "Llegar a las",
+    "service": "Servicio",
+    "setupInfo_one": "{{count}} min de montaje",
+    "setupInfo_other": "{{count}} min de montaje",
+    "state": {
+      "setupDone": "Montaje listo {{time}}",
+      "arrived": "Llegaron {{time}}",
+      "onTheWay": "En camino desde {{time}}",
+      "shouldHaveLeft_one": "Debieron salir hace {{count}} min",
+      "shouldHaveLeft_other": "Debieron salir hace {{count}} min",
+      "finished": "Terminado {{time}}"
+    },
+    "step": {
+      "departed": "Saliendo",
+      "arrived": "Llegamos",
+      "setup_done": "Montaje listo",
+      "finished": "Terminamos"
+    },
+    "updatedBy": "por {{name}}",
+    "unassign": "Sin camión",
+    "adjust": "Ajustar tiempos",
+    "driveMin": "Camino",
+    "setupMin": "Montaje",
+    "adjustHint": "Déjalo vacío para usar tus valores normales. Recoger = tiempo después del servicio antes de que salga el camión.",
+    "problems_one": "1 problema",
+    "problems_other": "{{count}} problemas",
+    "route": "Ruta",
+    "noStops": "No hay eventos en este camión.",
+    "freeAt": "El camión queda libre a las {{time}}",
+    "settings": {
+      "title": "Camiones y tiempos",
+      "kitchen": "Dirección de la cocina",
+      "kitchenPlaceholder": "De dónde salen los camiones",
+      "kitchenHint": "Es el punto de partida de la ruta de cada camión en Google Maps.",
+      "setup": "Montaje (min)",
+      "setupHint": "Cuánto antes del servicio hay que llegar",
+      "drive": "Camino normal (min)",
+      "driveHint": "Se usa hasta que pongas el tiempo de cada parada",
+      "trucks": "Camiones / equipos",
+      "truckPlaceholder": "Camión {{n}}",
+      "deleteTruck": "¿Borrar {{name}}? Sus eventos necesitarán otro camión.",
+      "teardown": "Recoger (min)",
+      "teardownHint": "Después del servicio, antes de salir",
+      "service": "Duración del servicio (min)",
+      "serviceHint": "Se usa cuando el evento no tiene hora de término"
+    },
+    "until": "hasta {{time}}",
+    "untilEstimated": "hasta ~{{time}}",
+    "packUpInfo_one": "{{count}} min para recoger, sale {{time}}",
+    "packUpInfo_other": "{{count}} min para recoger, sale {{time}}",
+    "noEndTime": "sin hora de término",
+    "packUpMin": "Recoger"
   }
 }

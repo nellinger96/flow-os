@@ -27,7 +27,8 @@
     "businessAnalytics": "Business Analytics",
     "businessSettings": "Business Settings",
     "digitalContract": "Digital Contract",
-    "loadout": "Load-out"
+    "loadout": "Load-out",
+    "eventDay": "Event day"
   },
   "status": {
     "lead": "Lead",
@@ -73,7 +74,7 @@
   },
   "event": {
     "date": "Event date",
-    "time": "Service time",
+    "time": "Start time",
     "guests": "Guests",
     "pricePerPerson": "Price per person",
     "total": "Total",
@@ -91,7 +92,8 @@
     "noTimeline": "No timeline yet.",
     "activity": "Activity",
     "printKitchenSheet": "Kitchen sheet",
-    "printInvoice": "Invoice"
+    "printInvoice": "Invoice",
+    "endTime": "End time"
   },
   "menu": {
     "search": "Search your menu…",
@@ -319,7 +321,8 @@
       "time": "start time",
       "address": "address",
       "schedule": "payment schedule",
-      "contract": "contract"
+      "contract": "contract",
+      "endTime": "end time"
     }
   },
   "loadout": {
@@ -475,6 +478,91 @@
     "namePlaceholder": "Your name",
     "start": "Start",
     "hi": "Hi {{name}}",
-    "notYou": "Not you?"
+    "notYou": "Not you?",
+    "contract": "Contract",
+    "contractSigned": "Signed by {{name}} · {{date}}",
+    "contractNotSigned": "Contract not signed yet",
+    "terms": "Terms & conditions",
+    "pricesHidden": "Prices and payments are hidden for the crew."
+  },
+  "day": {
+    "tabSchedule": "Schedule",
+    "tabLoadout": "Load-out",
+    "tabRoute": "Route",
+    "shareShort": "Crew link",
+    "trucksTimes": "Trucks & times",
+    "setupTrucksTitle": "Add your trucks and kitchen address",
+    "setupTrucksBody": "Then assign each event to a truck to get leave-by times and warnings when a truck can't make it.",
+    "problemsBanner_one": "1 stop can't be made in time. Move it to another truck or adjust the times.",
+    "problemsBanner_other": "{{count}} stops can't be made in time. Move them to another truck or adjust the times.",
+    "unassigned_one": "1 event needs a truck",
+    "unassigned_other": "{{count}} events need a truck",
+    "shareTruck": "Crew link for {{name}}",
+    "shareMessage": "{{who}} – {{date}}. Your stops and load-out list: {{url}}",
+    "allTrucks": "All trucks",
+    "shareExplainTruck": "The {{name}} crew sees only their stops for {{date}}: leave-by times, directions, Leaving / Arrived / Setup done buttons and their load-out list. No login needed, no prices.",
+    "planForDay": "Schedule & load-out for this day",
+    "nothingAssigned": "No events are assigned to a truck yet.",
+    "kitchen": "Kitchen",
+    "prevStop": "previous stop",
+    "driveFrom_one": "{{count}} min drive from {{from}}",
+    "driveFrom_other": "{{count}} min drive from {{from}}",
+    "checkMaps": "Check in Maps",
+    "cantMakeIt_one": "Can't make it: the truck will be {{count}} min late from the previous stop.",
+    "cantMakeIt_other": "Can't make it: the truck will be {{count}} min late from the previous stop.",
+    "noTime": "No start time. Add one to schedule this stop.",
+    "leaveBy": "Leave by",
+    "arriveBy": "Arrive by",
+    "service": "Service",
+    "setupInfo_one": "{{count}} min setup",
+    "setupInfo_other": "{{count}} min setup",
+    "state": {
+      "setupDone": "Setup done {{time}}",
+      "arrived": "Arrived {{time}}",
+      "onTheWay": "On the way since {{time}}",
+      "shouldHaveLeft_one": "Should have left {{count}} min ago",
+      "shouldHaveLeft_other": "Should have left {{count}} min ago",
+      "finished": "Done {{time}}"
+    },
+    "step": {
+      "departed": "Leaving",
+      "arrived": "Arrived",
+      "setup_done": "Setup done",
+      "finished": "Done"
+    },
+    "updatedBy": "by {{name}}",
+    "unassign": "No truck",
+    "adjust": "Adjust times",
+    "driveMin": "Drive",
+    "setupMin": "Setup",
+    "adjustHint": "Leave blank to use your defaults. Pack-up = time after service ends before the truck can leave.",
+    "problems_one": "1 problem",
+    "problems_other": "{{count}} problems",
+    "route": "Route",
+    "noStops": "No events on this truck.",
+    "freeAt": "Truck is free at {{time}}",
+    "settings": {
+      "title": "Trucks & times",
+      "kitchen": "Kitchen address",
+      "kitchenPlaceholder": "Where the trucks leave from",
+      "kitchenHint": "Used as the starting point for each truck's route in Google Maps.",
+      "setup": "Setup time (min)",
+      "setupHint": "How early to arrive before service",
+      "drive": "Typical drive (min)",
+      "driveHint": "Used until you set a stop's drive time",
+      "trucks": "Trucks / crews",
+      "truckPlaceholder": "Truck {{n}}",
+      "deleteTruck": "Delete {{name}}? Its events will need a new truck.",
+      "teardown": "Pack-up (min)",
+      "teardownHint": "After service ends, before leaving",
+      "service": "Service length (min)",
+      "serviceHint": "Used when an event has no end time"
+    },
+    "until": "until {{time}}",
+    "untilEstimated": "until ~{{time}}",
+    "packUpInfo_one": "{{count}} min pack-up, leaves {{time}}",
+    "packUpInfo_other": "{{count}} min pack-up, leaves {{time}}",
+    "noEndTime": "no end time set",
+    "packUpMin": "Pack-up"
   }
 }

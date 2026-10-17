@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, Check, Clock, MapPin, Pencil, Phone, Plus, RotateCcw, Users, X } from 'lucide-react'
-import { dialable, formatTime, toNumber } from '../../lib/format'
+import { AlertTriangle, Check, Clock, FileText, MapPin, Pencil, Phone, Plus, RotateCcw, Users, X } from 'lucide-react'
+import { dialable, formatTimeRange, toNumber } from '../../lib/format'
 import { formatQty, GEAR_CATEGORIES } from '../../lib/loadout'
 
 // One event's checklist. Used by the owner (Load-out page) and by crews (share link).
 //   phase:   'load' (into the truck) | 'return' (packed back up)
 //   actions: { toggle(item, done), add(label, qty), remove?(item), restore?(item), setQty?(item, qty) }
 //            remove / restore / setQty are owner-only.
-export default function EventChecklist({ client, list, phase, actions, pending, onOpenClient }) {
+export default function EventChecklist({ client, list, phase, actions, pending, onOpenClient, onContract }) {
     const { t, i18n } = useTranslation()
     const lng = i18n.language
     const [adding, setAdding] = useState(false)
@@ -62,12 +62,13 @@ export default function EventChecklist({ client, list, phase, actions, pending, 
                             <div className="truncate text-lg font-extrabold text-slate-900">{client.full_name || '—'}</div>
                         )}
                         <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-slate-600">
-                            <span className="flex items-center gap-1"><Clock size={13} />{formatTime(sd.event_time, lng) || t('calendar.noTime')}</span>
+                            <span className="flex items-center gap-1"><Clock size={13} />{formatTimeRange(sd.event_time, sd.event_end_time, lng) || t('calendar.noTime')}</span>
                             {guests > 0 && <span className="flex items-center gap-1"><Users size={13} />{t('clients.guestsShort', { count: guests })}</span>}
                             {client.city && <span className="flex items-center gap-1"><MapPin size={13} />{client.city}</span>}
                         </div>
                     </div>
                     <div className="flex shrink-0 gap-1.5">
+                        {onContract && <button onClick={onContract} className="rounded-lg bg-blue-50 p-2 text-blue-700" aria-label={t('crew.contract')}><FileText size={18} /></button>}
                         {place && <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place)}`} target="_blank" rel="noreferrer" className="rounded-lg bg-blue-50 p-2 text-blue-700" aria-label={t('summary.map')}><MapPin size={18} /></a>}
                         {phone && <a href={`tel:${phone}`} className="rounded-lg bg-blue-50 p-2 text-blue-700" aria-label={t('summary.call')}><Phone size={18} /></a>}
                     </div>
