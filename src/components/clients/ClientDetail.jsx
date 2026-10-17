@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
     AlertTriangle, ArrowLeft, CalendarDays, Check, ChevronRight, CreditCard, FileSignature, Loader2,
-    MapPin, MessageSquare, MoreHorizontal, NotebookPen, Pencil, Phone, Printer, ShoppingBag, Trash2, UtensilsCrossed,
+    MapPin, MessageSquare, MoreHorizontal, NotebookPen, Pencil, Phone, Printer, ShoppingBag, Trash2, Truck, UtensilsCrossed,
 } from 'lucide-react'
-import { formatDate, formatTime, money, toNumber } from '../../lib/format'
+import { dialable, formatDate, formatTime, money, toNumber } from '../../lib/format'
 import { selectedMenu } from '../../lib/menu'
 import { PIPELINE } from '../../lib/status'
 import { invoiceHtml, kitchenSheetHtml, printHtml } from '../../lib/printDocs'
@@ -15,18 +16,13 @@ import MenuSheet from './MenuSheet'
 import PaymentsTab from './PaymentsTab'
 import ContractTab from './ContractTab'
 import NotesSheet from './NotesSheet'
+import SetupSheet from './SetupSheet'
 
 const STATUS_STYLE = {
     lead: 'bg-slate-100 text-slate-700',
     tasting: 'bg-amber-100 text-amber-800',
     proposal: 'bg-blue-100 text-blue-800',
     sold: 'bg-green-100 text-green-800',
-}
-
-// First US phone number in the field ("951-400-9866 951-231-7859" -> 9514009866)
-function dialable(phone) {
-    const m = String(phone || '').match(/(\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/)
-    return m ? m[0].replace(/[^\d+]/g, '') : ''
 }
 
 function Row({ icon: Icon, title, subtitle, alert, onClick }) {
@@ -62,6 +58,7 @@ export default function ClientDetail({
 }) {
     const { t, i18n } = useTranslation()
     const lng = i18n.language
+    const navigate = useNavigate()
     const [sheet, setSheet] = useState(null)
     const [menuOpen, setMenuOpen] = useState(false)
     const [statusSaving, setStatusSaving] = useState(false)
@@ -122,6 +119,7 @@ export default function ClientDetail({
         payments: { title: t('tabs.payments'), body: <PaymentsTab client={client} setClient={setClient} business={business} />, footer: saveFooter },
         contract: { title: t('tabs.contract'), body: <ContractTab client={client} savedClient={savedClient} dirty={dirty} onClientReplaced={onClientReplaced} business={business} /> },
         notes: { title: t('summary.notesKitchen'), body: <NotesSheet client={client} setClient={setClient} />, footer: saveFooter },
+        setup: { title: t('loadout.setup.title'), body: <SetupSheet client={client} setClient={setClient} />, footer: saveFooter },
     }
     const active = sheet && sheets[sheet]
 
@@ -163,6 +161,10 @@ export default function ClientDetail({
                                             [Printer, t('event.printInvoice'), () => printHtml(invoiceHtml({ client, business, t, lng }))],
                                             [Printer, t('event.printKitchenSheet'), () => printHtml(kitchenSheetHtml({ client, t, lng }))],
                                             [ShoppingBag, t('clients.groceryList'), onGrocery],
+                                            ...(sd.event_date ? [[Truck, t('loadout.checklistForEvent'), () => {
+                                                if (dirty && !window.confirm(t('clients.discardChanges'))) return
+                                                navigate(`/loadout?date=${String(sd.event_date).slice(0, 10)}`)
+                                            }]] : []),
                                         ].map(([Icon, label, action]) => (
                                             <button key={label} onClick={() => { setMenuOpen(false); action() }} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 active:bg-slate-50 md:hover:bg-slate-50">
                                                 <Icon size={16} /> {label}
@@ -233,6 +235,8 @@ export default function ClientDetail({
                             subtitle={[sd.guest_count ? t('clients.guestsShort', { count: Number(sd.guest_count) }) : null, sd.price_per_head ? t('summary.perPerson', { amount: money(sd.price_per_head) }) : null].filter(Boolean).join(' · ') || t('summary.tapToAdd')} />
                         <Row icon={UtensilsCrossed} title={t('tabs.menu')} onClick={() => setSheet('menu')}
                             subtitle={menu.set.size ? `${t('summary.items', { count: menu.set.size })} · ${menuNames.slice(0, 3).join(', ')}` : t('summary.tapToAdd')} />
+                        <Row icon={Truck} title={t('loadout.setup.title')} onClick={() => setSheet('setup')}
+                            subtitle={sd.setup?.table_covers ? `${t('loadout.setup.table_covers')}: ${sd.setup.table_covers}` : (sd.setup?.tables || sd.setup?.colors || t('summary.tapToAdd'))} />
                         <Row icon={CreditCard} title={t('tabs.payments')} onClick={() => setSheet('payments')} subtitle={paymentsLine} />
                         <Row icon={FileSignature} title={t('tabs.contract')} onClick={() => setSheet('contract')} subtitle={contractLine} />
                         <Row icon={sd.dietary_restrictions ? AlertTriangle : NotebookPen} title={t('summary.notesKitchen')} onClick={() => setSheet('notes')}

@@ -58,3 +58,9 @@ export function todayISO() {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
+
+// First US phone number in the field ("951-400-9866 951-231-7859" -> 9514009866)
+export function dialable(phone) {
+    const m = String(phone || '').match(/(\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/)
+    return m ? m[0].replace(/[^\d+]/g, '') : ''
+}

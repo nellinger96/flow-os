@@ -1,11 +1,20 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useNavigate } from 'react-router-dom'
-import { DollarSign, AlertCircle, ArrowRight, Calendar } from 'lucide-react'
+import { DollarSign, AlertCircle, ArrowRight, Calendar, Clock } from 'lucide-react'
+import { formatDate, todayISO } from '../lib/format'
+import { paymentSummary } from '../lib/payments'
+
+const STATUS_STYLE = {
+    Paid: { label: 'Paid in Full', bg: '#dcfce7', fg: '#166534' },
+    Overdue: { label: 'Overdue', bg: '#fee2e2', fg: '#b91c1c' },
+    Partial: { label: 'Partial', bg: '#fef3c7', fg: '#b45309' },
+    Unpaid: { label: 'Unpaid', bg: '#f1f5f9', fg: '#475569' },
+}
 
 export default function Invoices() {
     const [invoices, setInvoices] = useState([])
-    const [metrics, setMetrics] = useState({ totalOutstanding: 0, overdueCount: 0 })
+    const [metrics, setMetrics] = useState({ totalOutstanding: 0, owingCount: 0, overdueTotal: 0, overdueCount: 0 })
     const [loading, setLoading] = useState(true)
     const navigate = useNavigate()
 
@@ -17,72 +26,52 @@ export default function Invoices() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
 
-        // SECURITY LOCK: Only fetch my clients
+        // SECURITY LOCK: Only fetch my clients. Only booked (sold) jobs are owed money;
+        // leads, tastings and proposals are quotes, not invoices.
         const { data: clients } = await supabase
             .from('customers')
             .select('id, full_name, job_price, service_data, status')
             .eq('user_id', user.id) // <--- CRITICAL SECURITY FIX
+            .eq('status', 'sold')
             .order('created_at', { ascending: false })
 
         if (clients) {
+            const today = todayISO()
+
             const processed = clients.map(client => {
-                const s = client.service_data || {}
-                
-                // 1. Calculate Total Job Price
-                // Try the main column, then try calculating from service_data
-                let total = parseFloat(client.job_price)
-                if (isNaN(total) || total === 0) {
-                    total = (parseFloat(s.price_per_head) || 0) * (parseFloat(s.guest_count) || 0)
-                }
-
-                // 2. Calculate Paid Amount (Using the "Safe Mode" keys from Directory)
-                let paidAmount = 0
-                
-                // Payment 1 (Deposit)
-                const p1Amount = parseFloat(s.payment_1_amount || s.deposit_amount || 0)
-                const p1Paid = (s.payment_1_status || s.deposit_status || '').toLowerCase() === 'paid'
-                if (p1Paid) paidAmount += p1Amount
-
-                // Payment 2 (Final)
-                const p2Amount = parseFloat(s.payment_2_amount || s.final_payment_amount || 0)
-                const p2Paid = (s.payment_2_status || s.final_payment_status || '').toLowerCase() === 'paid'
-                if (p2Paid) paidAmount += p2Amount
-
-                // Check for Payment Plan Array (Legacy support)
-                if (paidAmount === 0 && Array.isArray(s.payment_plan)) {
-                     paidAmount = s.payment_plan.reduce((sum, item) => item.paid ? sum + (parseFloat(item.amount) || 0) : sum, 0)
-                }
-
-                const balance = total - paidAmount
-                
-                // Date handling (Safe Mode)
-                const eventDate = s.event_date || s.service_date || 'TBD'
-                
-                // Determine Status
-                let status = 'Unpaid'
-                if (balance <= 0 && total > 0) status = 'Paid'
-                else if (paidAmount > 0) status = 'Partial'
-
+                const m = paymentSummary(client, today)
                 return {
                     id: client.id,
-                    name: client.full_name,
-                    date: eventDate,
-                    total: total || 0,
-                    paid: paidAmount,
-                    balance: balance > 0 ? balance : 0,
-                    status
+                    name: client.full_name || '—',
+                    date: client.service_data?.event_date || client.service_data?.service_date || '',
+                    total: m.total,
+                    paid: m.paid,
+                    balance: m.balance,
+                    overdueAmount: m.overdueAmount,
+                    nextDue: m.nextDue,
+                    status: m.status,
                 }
             })
 
+            // Overdue first, then whatever is due soonest, then paid-up jobs
+            const rank = { Overdue: 0, Partial: 1, Unpaid: 1, Paid: 2 }
+            processed.sort((a, b) =>
+                rank[a.status] - rank[b.status] ||
+                (a.nextDue?.date || '9999').localeCompare(b.nextDue?.date || '9999')
+            )
+
             setInvoices(processed)
 
-            // Calculate Metrics
-            const outstanding = processed.reduce((sum, inv) => sum + inv.balance, 0)
-            const count = processed.filter(inv => inv.balance > 0).length
-            
-            setMetrics({ totalOutstanding: outstanding, overdueCount: count })
-            setLoading(false)
+            const owing = processed.filter(inv => inv.balance > 0)
+            const overdue = processed.filter(inv => inv.overdueAmount > 0)
+            setMetrics({
+                totalOutstanding: owing.reduce((sum, inv) => sum + inv.balance, 0),
+                owingCount: owing.length,
+                overdueTotal: overdue.reduce((sum, inv) => sum + inv.overdueAmount, 0),
+                overdueCount: overdue.length,
+            })
         }
+        setLoading(false)
     }
 
     return (
@@ -99,24 +88,39 @@ export default function Invoices() {
             {/* METRICS CARDS */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '40px' }}>
                 
-                {/* OUTSTANDING */}
+                {/* OVERDUE */}
                 <div style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '10px' }}>
                         <div style={{ background: '#fee2e2', padding: '10px', borderRadius: '8px', color: '#ef4444' }}><AlertCircle size={24}/></div>
-                        <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#64748b' }}>Outstanding Revenue</span>
+                        <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#64748b' }}>Overdue</span>
                     </div>
-                    <div style={{ fontSize: '32px', fontWeight: '900', color: '#ef4444' }}>${metrics.totalOutstanding.toLocaleString()}</div>
-                    <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '5px' }}>Across {metrics.overdueCount} active jobs</div>
+                    <div style={{ fontSize: '32px', fontWeight: '900', color: metrics.overdueTotal > 0 ? '#ef4444' : '#1e293b' }}>${metrics.overdueTotal.toLocaleString()}</div>
+                    <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '5px' }}>
+                        {metrics.overdueCount === 0 ? 'Nothing past due' : `${metrics.overdueCount} ${metrics.overdueCount === 1 ? 'client' : 'clients'} past due`}
+                    </div>
                 </div>
 
-                {/* TOTAL REVENUE */}
+                {/* STILL OWED */}
+                <div style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '10px' }}>
+                        <div style={{ background: '#fef3c7', padding: '10px', borderRadius: '8px', color: '#d97706' }}><Clock size={24}/></div>
+                        <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#64748b' }}>Still Owed</span>
+                    </div>
+                    <div style={{ fontSize: '32px', fontWeight: '900', color: '#1e293b' }}>${metrics.totalOutstanding.toLocaleString()}</div>
+                    <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '5px' }}>Across {metrics.owingCount} booked {metrics.owingCount === 1 ? 'job' : 'jobs'}</div>
+                </div>
+
+                {/* TOTAL BOOKED */}
                 <div style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '10px' }}>
                         <div style={{ background: '#dcfce7', padding: '10px', borderRadius: '8px', color: '#16a34a' }}><DollarSign size={24}/></div>
-                        <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#64748b' }}>Total Job Value</span>
+                        <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#64748b' }}>Total Booked</span>
                     </div>
                     <div style={{ fontSize: '32px', fontWeight: '900', color: '#1e293b' }}>
                         ${invoices.reduce((sum, i) => sum + i.total, 0).toLocaleString()}
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '5px' }}>
+                        ${invoices.reduce((sum, i) => sum + i.paid, 0).toLocaleString()} collected
                     </div>
                 </div>
 
@@ -135,6 +139,7 @@ export default function Invoices() {
                                 <th style={{ textAlign: 'left', padding: '15px 20px', color: '#64748b', textTransform: 'uppercase', fontSize: '12px', fontWeight: 'bold' }}>Client</th>
                                 <th style={{ textAlign: 'left', padding: '15px 20px', color: '#64748b', textTransform: 'uppercase', fontSize: '12px', fontWeight: 'bold' }}>Event Date</th>
                                 <th style={{ textAlign: 'left', padding: '15px 20px', color: '#64748b', textTransform: 'uppercase', fontSize: '12px', fontWeight: 'bold' }}>Status</th>
+                                <th style={{ textAlign: 'left', padding: '15px 20px', color: '#64748b', textTransform: 'uppercase', fontSize: '12px', fontWeight: 'bold' }}>Next Payment</th>
                                 <th style={{ textAlign: 'right', padding: '15px 20px', color: '#64748b', textTransform: 'uppercase', fontSize: '12px', fontWeight: 'bold' }}>Total</th>
                                 <th style={{ textAlign: 'right', padding: '15px 20px', color: '#64748b', textTransform: 'uppercase', fontSize: '12px', fontWeight: 'bold' }}>Paid</th>
                                 <th style={{ textAlign: 'right', padding: '15px 20px', color: '#64748b', textTransform: 'uppercase', fontSize: '12px', fontWeight: 'bold' }}>Balance Due</th>
@@ -144,7 +149,7 @@ export default function Invoices() {
                         <tbody>
                             {invoices.length === 0 && (
                                 <tr>
-                                    <td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>No invoices found. Add clients to see data here.</td>
+                                    <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>No booked jobs yet. Mark a client as Sold to see their balance here.</td>
                                 </tr>
                             )}
                             {invoices.map((inv) => (
@@ -159,17 +164,29 @@ export default function Invoices() {
                                     </td>
                                     <td style={{ padding: '15px 20px', color: '#64748b' }}>
                                         <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
-                                            <Calendar size={14}/> {inv.date}
+                                            <Calendar size={14}/> {formatDate(inv.date, 'en') || inv.date || 'TBD'}
                                         </div>
                                     </td>
                                     <td style={{ padding: '15px 20px' }}>
                                         <span style={{
-                                            padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold',
-                                            background: inv.status === 'Paid' ? '#dcfce7' : inv.status === 'Partial' ? '#fef3c7' : '#fee2e2',
-                                            color: inv.status === 'Paid' ? '#166534' : inv.status === 'Partial' ? '#b45309' : '#b91c1c'
+                                            padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap',
+                                            background: STATUS_STYLE[inv.status].bg,
+                                            color: STATUS_STYLE[inv.status].fg
                                         }}>
-                                            {inv.status === 'Paid' ? 'Paid in Full' : inv.status === 'Partial' ? 'Partial' : 'Unpaid'}
+                                            {STATUS_STYLE[inv.status].label}
                                         </span>
+                                    </td>
+                                    <td style={{ padding: '15px 20px', fontSize: '13px', whiteSpace: 'nowrap' }}>
+                                        {inv.nextDue ? (
+                                            <>
+                                                <div style={{ fontWeight: 'bold', color: '#1e293b' }}>${inv.nextDue.amount.toLocaleString()}</div>
+                                                <div style={{ color: inv.nextDue.late ? '#b91c1c' : '#64748b', fontWeight: inv.nextDue.late ? 'bold' : 'normal' }}>
+                                                    {inv.nextDue.date
+                                                        ? `${inv.nextDue.late ? 'Was due' : 'Due'} ${formatDate(inv.nextDue.date, 'en', { month: 'short', day: 'numeric' }) || inv.nextDue.date}`
+                                                        : 'No due date set'}
+                                                </div>
+                                            </>
+                                        ) : <span style={{ color: '#cbd5e1' }}>-</span>}
                                     </td>
                                     <td style={{ padding: '15px 20px', textAlign: 'right', color: '#64748b' }}>${inv.total.toLocaleString()}</td>
                                     <td style={{ padding: '15px 20px', textAlign: 'right', color: '#16a34a', fontWeight: 'bold' }}>${inv.paid.toLocaleString()}</td>
@@ -178,7 +195,7 @@ export default function Invoices() {
                                     </td>
                                     <td style={{ padding: '15px 20px', textAlign: 'center' }}>
                                         <button 
-                                            onClick={() => navigate('/clients')} 
+                                            onClick={() => navigate(`/clients?id=${inv.id}`)} 
                                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1' }}
                                             title="View Details"
                                         >

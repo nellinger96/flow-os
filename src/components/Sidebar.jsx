@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { supabase, isTestDatabase } from '../supabaseClient'
 import { LANGUAGES } from '../i18n'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Home, Users, FileText, BarChart3, Settings, LogOut, X, Calendar } from 'lucide-react'
+import { Home, Users, FileText, BarChart3, Settings, LogOut, X, Calendar, Truck } from 'lucide-react'
 
 export default function Sidebar({ isOpen, onClose, onLogout }) {
     const navigate = useNavigate()
@@ -26,6 +26,7 @@ export default function Sidebar({ isOpen, onClose, onLogout }) {
     const menuItems = [
         { label: t('nav.dashboard'), path: '/', icon: <Home size={20} /> },
         { label: t('nav.calendar'), path: '/calendar', icon: <Calendar size={20} /> },
+        { label: t('nav.loadout'), path: '/loadout', icon: <Truck size={20} /> },
         { label: t('nav.directory'), path: '/clients', icon: <Users size={20} /> },
         { label: t('nav.invoices'), path: '/invoices', icon: <FileText size={20} /> },
         { label: t('nav.analytics'), path: '/analytics', icon: <BarChart3 size={20} /> },
@@ -72,7 +73,7 @@ export default function Sidebar({ isOpen, onClose, onLogout }) {
                 {/* MENU ITEMS */}
                 <div style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {menuItems.map(item => {
-                        const isActive = location.pathname === item.path
+                        const isActive = item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path)
                         return (
                             <button
                                 key={item.path}

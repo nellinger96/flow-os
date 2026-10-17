@@ -155,3 +155,48 @@ export function contractHtml({ contract, business, t, lng }) {
       </div>`
     return page(`${t('doc.contract')} – ${contract.full_name || ''}`, body)
 }
+
+// Load-out sheet for a day: one page per event with boxes to tick when loading
+// and when packing back up. `events` is [{ client, items }] from buildLoadList.
+export function loadoutHtml({ day, events, t, lng }) {
+    const css = `
+      .event { page-break-after: always; }
+      .event:last-child { page-break-after: auto; }
+      .setup { border: 4px solid #0f172a; border-radius: 12px; padding: 12px 16px; margin: 14px 0; font-size: 17px; }
+      .setup .big { font-size: 26px; font-weight: 900; }
+      table { width: 100%; border-collapse: collapse; font-size: 15px; }
+      th { text-align: left; font-size: 11px; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #0f172a; padding: 6px 4px; }
+      td { border-bottom: 1px solid #e2e8f0; padding: 8px 4px; vertical-align: top; }
+      .box-cell { width: 54px; text-align: center; font-size: 22px; }
+      .qty { width: 48px; font-weight: 900; }
+      .why { color: #64748b; font-size: 12px; }`
+    const body = events.map(({ client, items }) => {
+        const sd = client.service_data || {}
+        const setup = sd.setup || {}
+        const place = [client.address, client.city].filter(Boolean).join(', ')
+        const setupLines = [
+            setup.table_covers ? `<div class="big">${esc(t('loadout.setup.table_covers'))}: ${esc(setup.table_covers)}</div>` : '',
+            setup.tables ? `<div><strong>${esc(t('loadout.setup.tables'))}:</strong> ${esc(setup.tables)}</div>` : '',
+            setup.colors ? `<div><strong>${esc(t('loadout.setup.colors'))}:</strong> ${esc(setup.colors)}</div>` : '',
+            setup.notes ? `<div><strong>${esc(t('loadout.setup.notes'))}:</strong> ${esc(setup.notes)}</div>` : '',
+            sd.dietary_restrictions ? `<div style="color:#dc2626;font-weight:bold">${esc(t('doc.dietaryAlert'))}: ${esc(sd.dietary_restrictions)}</div>` : '',
+        ].join('')
+        const rows = items.map(i => `<tr>
+            <td class="box-cell">☐</td><td class="box-cell">☐</td>
+            <td class="qty">${esc(i.qty ? Math.round(i.qty * 100) / 100 : '')}</td>
+            <td><strong>${esc(i.name)}</strong></td>
+          </tr>`).join('')
+        return `<div class="event">
+          <div class="header" style="margin-bottom:8px">
+            <div><div class="biz" style="color:#0f172a">${esc(client.full_name)}</div>
+              <div class="muted">${esc(formatDate(day, lng, { weekday: 'long', month: 'long', day: 'numeric' }))} · ${esc(formatTime(sd.event_time, lng) || t('common.tbd'))} · ${esc(t('clients.guestsShort', { count: toNumber(sd.guest_count) }))}</div>
+              <div class="muted">${esc(place)}</div></div>
+            <div class="doc-title">${esc(t('loadout.title'))}</div>
+          </div>
+          ${setupLines ? `<div class="setup">${setupLines}</div>` : ''}
+          <table><thead><tr><th class="box-cell">${esc(t('loadout.loaded'))}</th><th class="box-cell">${esc(t('loadout.back'))}</th><th>${esc(t('loadout.qty'))}</th><th>${esc(t('loadout.item'))}</th></tr></thead>
+          <tbody>${rows || `<tr><td colspan="4" class="why">${esc(t('loadout.emptyList'))}</td></tr>`}</tbody></table>
+        </div>`
+    }).join('')
+    return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(t('loadout.title'))}</title><style>${BASE_CSS}${css}</style></head><body>${body}</body></html>`
+}

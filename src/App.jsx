@@ -10,6 +10,9 @@ import LandingPage from './pages/LandingPage' // NEW
 import Signup from './pages/Signup' // NEW
 import Dashboard from './pages/Dashboard'
 import Calendar from './pages/Calendar'
+import Loadout from './pages/Loadout'
+import Equipment from './pages/Equipment'
+import CrewDay from './pages/CrewDay'
 import Tracker from './pages/Tracker'
 import Analytics from './pages/Analytics'
 import Clients from './pages/Clients'
@@ -34,6 +37,7 @@ function TopBar({ onOpenMenu }) {
     // Dynamic Title based on route
     let title = t('nav.dashboard')
     if (location.pathname === '/calendar') title = t('nav.eventCalendar')
+    if (location.pathname.startsWith('/loadout')) title = t('nav.loadout')
     if (location.pathname === '/map') title = t('nav.routeMap')
     if (location.pathname === '/analytics') title = t('nav.businessAnalytics')
     if (location.pathname === '/clients') title = t('nav.directory')
@@ -103,6 +107,7 @@ function App() {
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/sign/:id" element={<SignContract />} />
+                <Route path="/crew/:token" element={<CrewDay />} />
                 <Route path="/update-password" element={<UpdatePassword />} />
                 
                 {/* Catch-all redirects to Landing Page instead of Login */}
@@ -135,6 +140,8 @@ function App() {
                 <Route path="/dashboard" element={<SubscriptionGate><Dashboard /></SubscriptionGate>} />
                 
                 <Route path="/calendar" element={<SubscriptionGate><Calendar /></SubscriptionGate>} />
+                <Route path="/loadout" element={<SubscriptionGate><Loadout /></SubscriptionGate>} />
+                <Route path="/loadout/equipment" element={<SubscriptionGate><Equipment /></SubscriptionGate>} />
                 <Route path="/map" element={<SubscriptionGate><Tracker /></SubscriptionGate>} />
                 <Route path="/analytics" element={<SubscriptionGate><Analytics /></SubscriptionGate>} />
                 <Route path="/clients" element={<SubscriptionGate><Clients /></SubscriptionGate>} />
@@ -145,6 +152,7 @@ function App() {
                 {/* Users need to access these even if subscription is expired */}
                 <Route path="/stripe-callback" element={<StripeCallback />} />
                 <Route path="/sign/:id" element={<SignContract />} />
+                <Route path="/crew/:token" element={<CrewDay />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/update-password" element={<UpdatePassword />} />

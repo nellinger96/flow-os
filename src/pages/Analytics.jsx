@@ -1,23 +1,12 @@
 import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../supabaseClient'
-import { BarChart3, TrendingUp, MapPin, Calendar, DollarSign, Wallet, Users, Target } from 'lucide-react'
-import { 
-    ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid, 
-    AreaChart, Area, PieChart, Pie, Cell, Legend, LineChart, Line
-} from 'recharts'
+import { UtensilsCrossed, MapPin, Calendar, DollarSign, Wallet, Users, Target } from 'lucide-react'
+import { ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid, AreaChart, Area } from 'recharts'
 
 export default function Analytics() {
     const [loading, setLoading] = useState(true)
     const [rawCustomers, setRawCustomers] = useState([])
-    const [timeframe, setTimeframe] = useState('all') 
-    
-    // Chart Toggles
-    const [revenueChartType, setRevenueChartType] = useState('area')
-    const [menuChartType, setMenuChartType] = useState('hbar') // hbar, vbar, donut
-    const [cityChartType, setCityChartType] = useState('donut') // donut, pie, bar
-
-    // Premium colors for the charts
-    const COLORS = ['#2563EB', '#8B5CF6', '#F43F5E', '#F59E0B', '#10B981', '#06B6D4', '#6366F1']
+    const [timeframe, setTimeframe] = useState('all')
 
     useEffect(() => {
         fetchData()
@@ -123,47 +112,77 @@ export default function Analytics() {
                     ...(c.service_data?.selected_menu_items || [])
                 ]
                 
+                const eventItems = new Set()
                 allItems.forEach(item => {
-                    if (item && typeof item === 'string') {
+                    if (item && typeof item === 'string' && item.trim()) {
                         // Title case the menu items for uniformity
-                        const cleanItem = item.trim().charAt(0).toUpperCase() + item.trim().slice(1).toLowerCase()
-                        itemMap[cleanItem] = (itemMap[cleanItem] || 0) + 1
+                        eventItems.add(item.trim().charAt(0).toUpperCase() + item.trim().slice(1).toLowerCase())
                     }
                 })
+                // Count each item once per event
+                eventItems.forEach(name => { itemMap[name] = (itemMap[name] || 0) + 1 })
             }
 
-            // MONTHLY TRENDS
+            // TRENDS (bucketed by day in month view, by month otherwise)
             const dateStr = c.service_data?.event_date || c.created_at
             if (dateStr) {
                 const date = new Date(dateStr)
-                const labelName = timeframe === 'month' 
-                    ? date.toLocaleString('default', { month: 'short', day: 'numeric' })
-                    : date.toLocaleString('default', { month: 'short', year: '2-digit' })
-                
-                if (!monthMap[labelName]) {
-                    monthMap[labelName] = { name: labelName, Events: 0, Revenue: 0 }
+                if (!isNaN(date)) {
+                    const key = bucketKey(date)
+                    if (!monthMap[key]) monthMap[key] = { Events: 0, Revenue: 0 }
+                    if (isSold) {
+                        monthMap[key].Events += 1
+                        monthMap[key].Revenue += price
+                    }
                 }
-                
-                monthMap[labelName].Events += 1
-                if (isSold) monthMap[labelName].Revenue += price
             }
         })
+
+        function bucketKey(d) {
+            return timeframe === 'month'
+                ? `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+                : `${d.getFullYear()}-${d.getMonth()}`
+        }
+
+        // Build a continuous axis so empty periods show as zero instead of being skipped
+        const buckets = []
+        if (timeframe === 'month') {
+            const days = new Date(currentYear, currentMonth + 1, 0).getDate()
+            for (let d = 1; d <= days; d++) buckets.push(new Date(currentYear, currentMonth, d))
+        } else if (sortedCustomers.some(c => !isNaN(new Date(c.service_data?.event_date || c.created_at)))) {
+            const dates = sortedCustomers
+                .map(c => new Date(c.service_data?.event_date || c.created_at))
+                .filter(d => !isNaN(d))
+            const first = timeframe === 'year' ? new Date(currentYear, 0, 1) : dates[0]
+            const lastDate = dates[dates.length - 1] > now ? dates[dates.length - 1] : now
+            const cursor = new Date(first.getFullYear(), first.getMonth(), 1)
+            while (cursor <= lastDate && buckets.length < 120) {
+                buckets.push(new Date(cursor))
+                cursor.setMonth(cursor.getMonth() + 1)
+            }
+        }
+        const monthlyTrends = buckets.map(d => ({
+            name: timeframe === 'month'
+                ? d.toLocaleString('default', { month: 'short', day: 'numeric' })
+                : d.toLocaleString('default', { month: 'short', year: '2-digit' }),
+            Events: monthMap[bucketKey(d)]?.Events || 0,
+            Revenue: monthMap[bucketKey(d)]?.Revenue || 0,
+        }))
 
         const topCities = Object.entries(cityMap)
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => b.value - a.value)
-            .slice(0, 6)
+            .slice(0, 8)
 
         const topItems = Object.entries(itemMap)
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => b.value - a.value)
-            .slice(0, 6)
+            .slice(0, 8)
 
-        const monthlyTrends = Object.values(monthMap)
-
-        return { 
-            bookedRevenue: bookedRev, 
-            pipelineRevenue: pipelineRev, 
+        return {
+            bookedRevenue: bookedRev,
+            pipelineRevenue: pipelineRev,
+            soldCount,
             avgOrderValue: soldCount > 0 ? bookedRev / soldCount : 0,
             avgGuests: soldCount > 0 ? Math.round(totalGuests / soldCount) : 0,
             conversionRate: filteredCustomers.length > 0 ? Math.round((soldCount / filteredCustomers.length) * 100) : 0,
@@ -173,17 +192,48 @@ export default function Analytics() {
         }
     }, [rawCustomers, timeframe])
 
-    const CustomTooltip = ({ active, payload }) => {
-        if (active && payload && payload.length) {
-            return (
-                <div style={{ background: 'white', padding: '10px', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-                    <p style={{ margin: 0, fontWeight: 'bold', color: '#1e293b' }}>{payload[0].name}</p>
-                    <p style={{ margin: 0, color: '#64748b' }}>{payload[0].value} {payload[0].dataKey === 'Revenue' ? 'Revenue' : 'Orders/Events'}</p>
-                </div>
-            )
-        }
-        return null
+    const TrendTooltip = ({ active, payload, label }) => {
+        if (!active || !payload?.length) return null
+        const row = payload[0].payload
+        return (
+            <div style={{ background: 'white', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 12px rgba(15,23,42,0.08)', fontSize: '13px' }}>
+                <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>{label}</div>
+                <div style={{ color: '#0f172a', fontWeight: 700 }}>${row.Revenue.toLocaleString()}</div>
+                <div style={{ color: '#64748b' }}>{row.Events} booked {row.Events === 1 ? 'event' : 'events'}</div>
+            </div>
+        )
     }
+
+    const formatAxisMoney = (v) => v >= 1000 ? `$${(v / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}k` : `$${v}`
+
+    const RankedList = ({ rows, total, unit, emptyText }) => {
+        if (!rows.length) return <div style={{ padding: '40px 0', textAlign: 'center', color: '#94a3b8' }}>{emptyText}</div>
+        const max = rows[0].value
+        return (
+            <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {rows.map((row, i) => {
+                    const share = total > 0 ? Math.round((row.value / total) * 100) : 0
+                    return (
+                        <li key={row.name} title={`${row.name}: ${row.value} ${unit} (${share}% of booked events)`}>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '6px' }}>
+                                <span style={{ width: '18px', fontSize: '12px', fontWeight: 700, color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>{i + 1}</span>
+                                <span style={{ flex: 1, minWidth: 0, fontSize: '14px', fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name}</span>
+                                <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>{row.value}</span>
+                                <span style={{ width: '40px', textAlign: 'right', fontSize: '12px', color: '#64748b', fontVariantNumeric: 'tabular-nums' }}>{share}%</span>
+                            </div>
+                            <div style={{ marginLeft: '28px', height: '6px', borderRadius: '3px', background: '#f1f5f9', overflow: 'hidden' }}>
+                                <div style={{ width: `${(row.value / max) * 100}%`, height: '100%', borderRadius: '3px', background: '#2563EB', opacity: i === 0 ? 1 : 0.55 }} />
+                            </div>
+                        </li>
+                    )
+                })}
+            </ol>
+        )
+    }
+
+    const cardStyle = { background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }
+    const cardTitleStyle = { margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', fontSize: '17px' }
+    const cardSubStyle = { margin: '4px 0 0 30px', fontSize: '13px', color: '#64748b' }
 
     if (loading) return (
         <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
@@ -195,7 +245,7 @@ export default function Analytics() {
     if (!metrics) return <div style={{padding:'40px', textAlign:'center', color:'#64748b'}}>No data available yet. Add some clients to see analytics.</div>
 
     return (
-        <div style={{ padding: '30px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'sans-serif', background: '#f8fafc', minHeight: '100vh' }}>
+        <div style={{ padding: 'clamp(16px, 4vw, 30px)', maxWidth: '1200px', margin: '0 auto', fontFamily: 'sans-serif', background: '#f8fafc', minHeight: '100vh' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '20px', marginBottom: '30px' }}>
                 <div>
@@ -252,150 +302,58 @@ export default function Analytics() {
                 </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '20px' }}>
-                
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: '20px' }}>
+
                 {/* 1. REVENUE TREND */}
-                <div style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', gridColumn: '1 / -1' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a' }}>
-                            <Calendar size={20} color="#64748b" /> Revenue Growth Trend
-                        </h3>
-                        <select value={revenueChartType} onChange={(e) => setRevenueChartType(e.target.value)} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: '#f8fafc', color: '#334155', cursor: 'pointer', outline: 'none', fontWeight: 'bold' }}>
-                            <option value="area">Area Chart</option>
-                            <option value="bar">Bar Graph</option>
-                            <option value="line">Line Chart</option>
-                        </select>
+                <div style={{ ...cardStyle, gridColumn: '1 / -1' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+                        <div>
+                            <h3 style={cardTitleStyle}><Calendar size={20} color="#64748b" /> Booked Revenue</h3>
+                            <p style={cardSubStyle}>{timeframe === 'month' ? 'By day, this month' : 'By month'} · hover for details</p>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '24px', fontWeight: 900, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>${metrics.bookedRevenue.toLocaleString()}</div>
+                            <div style={{ fontSize: '12px', color: '#64748b' }}>+ ${metrics.pipelineRevenue.toLocaleString()} in pipeline</div>
+                        </div>
                     </div>
 
-                    <div style={{ width: '100%', height: '300px' }}>
-                        {metrics.monthlyTrends.length === 0 ? <div style={{height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8'}}>Not enough data</div> : 
+                    <div style={{ width: '100%', height: '280px' }}>
+                        {metrics.monthlyTrends.length === 0 ? <div style={{height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8'}}>Not enough data</div> :
                             <ResponsiveContainer>
-                                {revenueChartType === 'area' ? (
-                                    <AreaChart data={metrics.monthlyTrends} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                        <defs>
-                                            <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#16a34a" stopOpacity={0.3}/>
-                                                <stop offset="95%" stopColor="#16a34a" stopOpacity={0}/>
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
-                                        <YAxis tickFormatter={(value) => `$${value}`} axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                                        <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']} />
-                                        <Area type="monotone" dataKey="Revenue" stroke="#16a34a" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
-                                    </AreaChart>
-                                ) : revenueChartType === 'bar' ? (
-                                    <BarChart data={metrics.monthlyTrends} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
-                                        <YAxis tickFormatter={(value) => `$${value}`} axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                                        <RechartsTooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']} />
-                                        <Bar dataKey="Revenue" fill="#16a34a" radius={[4, 4, 0, 0]} barSize={40} />
-                                    </BarChart>
-                                ) : (
-                                    <LineChart data={metrics.monthlyTrends} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
-                                        <YAxis tickFormatter={(value) => `$${value}`} axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                                        <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']} />
-                                        <Line type="monotone" dataKey="Revenue" stroke="#16a34a" strokeWidth={3} dot={{ r: 4, fill: '#16a34a', strokeWidth: 2, stroke: 'white' }} activeDot={{ r: 6 }} />
-                                    </LineChart>
-                                )}
+                                <AreaChart data={metrics.monthlyTrends} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#16a34a" stopOpacity={0.18}/>
+                                            <stop offset="100%" stopColor="#16a34a" stopOpacity={0}/>
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid vertical={false} stroke="#f1f5f9" />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={8} minTickGap={24} />
+                                    <YAxis tickFormatter={formatAxisMoney} axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} width={52} />
+                                    <RechartsTooltip content={<TrendTooltip />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1 }} />
+                                    <Area type="monotone" dataKey="Revenue" stroke="#16a34a" strokeWidth={2} fill="url(#colorRev)" dot={false} activeDot={{ r: 5, fill: '#16a34a', stroke: 'white', strokeWidth: 2 }} />
+                                </AreaChart>
                             </ResponsiveContainer>
                         }
                     </div>
                 </div>
 
-                {/* 2. POPULAR SERVICES */}
-                <div style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a' }}>
-                            <BarChart3 size={20} color="#64748b" /> Top Menu Items
-                        </h3>
-                        <select value={menuChartType} onChange={(e) => setMenuChartType(e.target.value)} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: '#f8fafc', color: '#334155', cursor: 'pointer', outline: 'none', fontWeight: 'bold' }}>
-                            <option value="hbar">Horizontal Bar</option>
-                            <option value="vbar">Vertical Bar</option>
-                            <option value="donut">Donut Chart</option>
-                        </select>
+                {/* 2. TOP MENU ITEMS */}
+                <div style={cardStyle}>
+                    <div style={{ marginBottom: '20px' }}>
+                        <h3 style={cardTitleStyle}><UtensilsCrossed size={20} color="#64748b" /> Top Menu Items</h3>
+                        <p style={cardSubStyle}>% of booked events that included it</p>
                     </div>
-
-                    <div style={{ width: '100%', height: '300px' }}>
-                        {metrics.topItems.length === 0 ? <div style={{height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8'}}>No items tracked</div> : 
-                            <ResponsiveContainer>
-                                {menuChartType === 'hbar' ? (
-                                    <BarChart data={metrics.topItems} layout="vertical" margin={{ top: 0, right: 30, left: 60, bottom: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
-                                        <XAxis type="number" hide />
-                                        <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fill: '#475569', fontSize: 12, fontWeight: 'bold'}} width={100} />
-                                        <RechartsTooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} />
-                                        <Bar dataKey="value" fill="#8B5CF6" radius={[0, 4, 4, 0]} barSize={25} name="Orders" />
-                                    </BarChart>
-                                ) : menuChartType === 'vbar' ? (
-                                    <BarChart data={metrics.topItems} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#475569', fontSize: 11, fontWeight: 'bold'}} dy={10} />
-                                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                                        <RechartsTooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} />
-                                        <Bar dataKey="value" fill="#8B5CF6" radius={[4, 4, 0, 0]} barSize={40} name="Orders" />
-                                    </BarChart>
-                                ) : (
-                                    <PieChart>
-                                        <Pie data={metrics.topItems} innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
-                                            {metrics.topItems.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                                        </Pie>
-                                        <RechartsTooltip content={<CustomTooltip />} />
-                                        <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{fontSize: '12px', fontWeight: 'bold', color: '#475569'}} />
-                                    </PieChart>
-                                )}
-                            </ResponsiveContainer>
-                        }
-                    </div>
+                    <RankedList rows={metrics.topItems} total={metrics.soldCount} unit="events" emptyText="No menu items tracked yet" />
                 </div>
 
                 {/* 3. TOP LOCATIONS */}
-                <div style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a' }}>
-                            <MapPin size={20} color="#64748b" /> Event Hotspots
-                        </h3>
-                        <select value={cityChartType} onChange={(e) => setCityChartType(e.target.value)} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: '#f8fafc', color: '#334155', cursor: 'pointer', outline: 'none', fontWeight: 'bold' }}>
-                            <option value="donut">Donut Chart</option>
-                            <option value="pie">Pie Chart</option>
-                            <option value="bar">Bar Graph</option>
-                        </select>
+                <div style={cardStyle}>
+                    <div style={{ marginBottom: '20px' }}>
+                        <h3 style={cardTitleStyle}><MapPin size={20} color="#64748b" /> Event Hotspots</h3>
+                        <p style={cardSubStyle}>Booked events by city</p>
                     </div>
-
-                    <div style={{ width: '100%', height: '300px' }}>
-                        {metrics.topCities.length === 0 ? <div style={{height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8'}}>No locations tracked</div> : 
-                            <ResponsiveContainer>
-                                {cityChartType === 'donut' ? (
-                                    <PieChart>
-                                        <Pie data={metrics.topCities} innerRadius={70} outerRadius={110} paddingAngle={5} dataKey="value">
-                                            {metrics.topCities.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                                        </Pie>
-                                        <RechartsTooltip content={<CustomTooltip />} />
-                                        <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{fontSize: '12px', fontWeight: 'bold', color: '#475569'}} />
-                                    </PieChart>
-                                ) : cityChartType === 'pie' ? (
-                                    <PieChart>
-                                        <Pie data={metrics.topCities} outerRadius={110} dataKey="value">
-                                            {metrics.topCities.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                                        </Pie>
-                                        <RechartsTooltip content={<CustomTooltip />} />
-                                        <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{fontSize: '12px', fontWeight: 'bold', color: '#475569'}} />
-                                    </PieChart>
-                                ) : (
-                                    <BarChart data={metrics.topCities} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#475569', fontSize: 11, fontWeight: 'bold'}} dy={10} />
-                                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                                        <RechartsTooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} />
-                                        <Bar dataKey="value" fill="#F43F5E" radius={[4, 4, 0, 0]} barSize={40} name="Events" />
-                                    </BarChart>
-                                )}
-                            </ResponsiveContainer>
-                        }
-                    </div>
+                    <RankedList rows={metrics.topCities} total={metrics.soldCount} unit="events" emptyText="No locations tracked yet" />
                 </div>
 
             </div>

@@ -1,298 +1,400 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Users, Calendar, ArrowRight, DollarSign, Sun, Activity, CheckCircle, Clock, FileText, ChevronDown } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import {
+    AlertTriangle, CalendarDays, CalendarPlus, CheckCircle2, ChevronRight, Clock, DollarSign, FileSignature,
+    Loader2, MapPin, Phone, Printer, Truck, UserPlus, Users, UserRound,
+} from 'lucide-react'
+import { dialable, formatDate, formatTime, money, parseLocalDate, toNumber, todayISO } from '../lib/format'
+import { isoDay, paymentSummary } from '../lib/payments'
+import { createLead } from '../lib/clients'
+import { ALL_MENU_FIELDS } from '../lib/menu'
+import { kitchenSheetHtml, printHtml } from '../lib/printDocs'
+import StatusBadge from '../components/clients/StatusBadge'
+
+const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+function addDays(iso, n) {
+    const d = parseLocalDate(iso)
+    d.setDate(d.getDate() + n)
+    return toISO(d)
+}
+const daysBetween = (from, to) => Math.round((parseLocalDate(to) - parseLocalDate(from)) / 86400000)
+
+const OPEN_STAGES = ['lead', 'tasting', 'proposal']
+const TONE = {
+    red: { icon: 'bg-red-100 text-red-600', text: 'text-red-700' },
+    amber: { icon: 'bg-amber-100 text-amber-700', text: 'text-amber-800' },
+    blue: { icon: 'bg-blue-100 text-blue-700', text: 'text-slate-600' },
+}
+const TONE_ORDER = { red: 0, amber: 1, blue: 2 }
+
+function Card({ title, action, children, className = '' }) {
+    return (
+        <section className={`rounded-2xl border border-slate-200 bg-white ${className}`}>
+            {(title || action) && (
+                <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-4 md:px-5">
+                    <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">{title}</h2>
+                    {action}
+                </div>
+            )}
+            {children}
+        </section>
+    )
+}
+
+function LinkButton({ onClick, children }) {
+    return (
+        <button onClick={onClick} className="flex items-center gap-0.5 text-sm font-semibold text-blue-600 hover:text-blue-700">
+            {children}<ChevronRight size={16} />
+        </button>
+    )
+}
+
+// One event with what the caterer needs on the day
+function EventBlock({ client, today, big, onOpen, onLoadout }) {
+    const { t, i18n } = useTranslation()
+    const lng = i18n.language
+    const sd = client.service_data || {}
+    const date = isoDay(sd.event_date)
+    const phone = dialable(client.phone)
+    const place = [client.address, client.city].filter(Boolean).join(', ')
+    const guests = toNumber(sd.guest_count)
+    const days = date ? daysBetween(today, date) : null
+    const when = days === 0 ? t('home.today') : days === 1 ? t('home.tomorrow') : t('home.inDays', { count: days })
+
+    const btn = 'flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold'
+    return (
+        <div className="px-4 py-3 md:px-5">
+            <div className="flex items-start justify-between gap-3">
+                <button onClick={onOpen} className="min-w-0 text-left">
+                    <div className={`truncate font-extrabold text-slate-900 hover:underline ${big ? 'text-xl' : 'text-base'}`}>{client.full_name || '—'}</div>
+                </button>
+                {big && days !== null && days > 0 && <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">{when}</span>}
+            </div>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
+                {big && date && <span className="flex items-center gap-1.5"><CalendarDays size={14} />{formatDate(date, lng, { weekday: 'short', month: 'short', day: 'numeric' })}</span>}
+                <span className="flex items-center gap-1.5"><Clock size={14} />{formatTime(sd.event_time, lng) || t('calendar.noTime')}</span>
+                {guests > 0 && <span className="flex items-center gap-1.5"><Users size={14} />{t('clients.guestsShort', { count: guests })}</span>}
+                {client.city && <span className="flex items-center gap-1.5"><MapPin size={14} />{client.city}</span>}
+            </div>
+            {sd.dietary_restrictions && (
+                <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-red-50 px-2.5 py-1.5 text-sm font-semibold text-red-700">
+                    <AlertTriangle size={14} className="shrink-0" /><span className="truncate">{t('doc.dietaryAlert')}: {sd.dietary_restrictions}</span>
+                </div>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2">
+                {place && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`} target="_blank" rel="noreferrer" className={`${btn} bg-blue-50 text-blue-700 hover:bg-blue-100`}><MapPin size={15} />{t('summary.map')}</a>}
+                {phone && <a href={`tel:${phone}`} className={`${btn} bg-blue-50 text-blue-700 hover:bg-blue-100`}><Phone size={15} />{t('summary.call')}</a>}
+                <button onClick={onLoadout} className={`${btn} bg-blue-50 text-blue-700 hover:bg-blue-100`}><Truck size={15} />{t('nav.loadout')}</button>
+                <button onClick={() => printHtml(kitchenSheetHtml({ client, t, lng }))} className={`${btn} bg-blue-50 text-blue-700 hover:bg-blue-100`}><Printer size={15} />{t('calendar.kitchen')}</button>
+                <button onClick={onOpen} className={`${btn} bg-slate-900 text-white hover:bg-slate-700`}>{t('calendar.openClient')}</button>
+            </div>
+        </div>
+    )
+}
 
 export default function Dashboard() {
+    const { t, i18n } = useTranslation()
+    const lng = i18n.language
     const [user, setUser] = useState(null)
-    const [searchParams, setSearchParams] = useSearchParams() 
-    
-    // Raw Data State
-    const [rawClients, setRawClients] = useState([])
-
-    // Display Stats State
-    const [stats, setStats] = useState({ 
-        clients: 0, 
-        revenueDisplay: 0, 
-        todayEvents: 0,
-        leads: 0, tastings: 0, proposals: 0, sold: 0
-    })
-
-    // Filters
-    const [revenueScope, setRevenueScope] = useState('year')
-    const [weather, setWeather] = useState({ temp: '--', condition: 'Loading...' })
-    
+    const [searchParams, setSearchParams] = useSearchParams()
+    const [clients, setClients] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [busy, setBusy] = useState(false)
+    const [showAllTodos, setShowAllTodos] = useState(false)
+    const newDateRef = useRef(null)
     const navigate = useNavigate()
 
-    // --- 1. THE STRIPE CATCHER (NEW) ---
-    // This runs immediately when the page loads to check if Stripe sent us a code
+    // --- 1. THE STRIPE CATCHER ---
+    // Stripe Connect sends the user back here with ?code=... after they link their account
     useEffect(() => {
         const stripeCode = searchParams.get('code')
-        
-        if (stripeCode) {
-            console.log("Caught Stripe Code! Sending to backend...")
-            finishStripeConnection(stripeCode)
-        }
+        if (stripeCode) finishStripeConnection(stripeCode)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams])
 
     async function finishStripeConnection(code) {
         try {
-            // Get the current user
             const { data: { user }, error: userError } = await supabase.auth.getUser()
             if (userError || !user) throw new Error("No user logged in.")
 
-            // Fire the code and the user_id to your Edge Function!
-            const { data, error } = await supabase.functions.invoke('stripe-connect', {
+            const { error } = await supabase.functions.invoke('stripe-connect', {
                 body: { code: code, user_id: user.id }
             })
-
             if (error) throw error
 
-            // Success! Clear the code from the URL so it doesn't run again
             alert("Bank Account Connected Successfully!")
-            setSearchParams({}) 
-            
-            // Optional: send them to the settings page so they see the green "Active" status
+            setSearchParams({})
             navigate('/settings')
-
         } catch (error) {
             console.error("Stripe Connection Failed:", error)
             alert("Failed to connect Stripe. Check the console.")
-            setSearchParams({}) 
+            setSearchParams({})
         }
     }
 
-    // --- 2. REGULAR DASHBOARD LOGIC ---
+    // --- 2. DATA ---
     useEffect(() => {
-        supabase.auth.getUser().then(({ data: { user } }) => {
-            if (user) {
-                setUser(user)
-                fetchWeather(user?.user_metadata?.city)
-                fetchData(user.id)
-            }
-        })
+        let cancelled = false
+        async function load() {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) { setLoading(false); return }
+            const { data } = await supabase.from('customers').select('*').eq('user_id', user.id)
+            if (cancelled) return
+            setUser(user)
+            setClients(data || [])
+            setLoading(false)
+        }
+        load()
+        return () => { cancelled = true }
     }, [])
 
-    useEffect(() => {
-        if (rawClients.length > 0) {
-            recalculateRevenue(revenueScope, rawClients)
-        }
-    }, [revenueScope, rawClients])
+    const today = todayISO()
 
-    async function fetchData(userId) {
-        if (!userId) return
+    const d = useMemo(() => {
+        const in7 = addDays(today, 7)
+        const in14 = addDays(today, 14)
+        const in30 = addDays(today, 30)
+        const weekStart = addDays(today, -parseLocalDate(today).getDay())
+        const weekEnd = addDays(weekStart, 6)
+        const monthPrefix = today.slice(0, 7)
 
-        const { data: clients } = await supabase
-            .from('customers')
-            .select('job_price, service_data, status, created_at')
-            .eq('user_id', userId) 
-        
-        if (clients) {
-            setRawClients(clients) 
+        const rows = clients.map(c => ({
+            client: c,
+            status: OPEN_STAGES.includes(c.status) || c.status === 'sold' ? c.status : 'lead',
+            date: isoDay(c.service_data?.event_date),
+        }))
+        const booked = rows.filter(r => r.status === 'sold')
+        const byDate = (a, b) => (a.date || '9999').localeCompare(b.date || '9999') || (a.client.service_data?.event_time || '99').localeCompare(b.client.service_data?.event_time || '99')
 
-            const totalClients = clients.length
-            const todayStr = new Date().toISOString().split('T')[0]
-            
-            const todayCount = clients.filter(c => {
-                const d = c.service_data?.event_date || c.service_data?.service_date
-                return d === todayStr
-            }).length
+        const todayEvents = booked.filter(r => r.date === today).sort(byDate)
+        const upcoming = booked.filter(r => r.date > today).sort(byDate)
 
-            const leads = clients.filter(c => !c.status || c.status === 'lead').length
-            const tastings = clients.filter(c => c.status === 'tasting').length
-            const proposals = clients.filter(c => c.status === 'proposal').length
-            const sold = clients.filter(c => c.status === 'sold' || c.status === 'booked').length
+        const week = { events: 0, guests: 0, due: 0 }
+        const cash = { owed: 0, overdue: 0, overdueClients: 0, dueSoon: 0, bookedThisMonth: 0 }
+        const todos = []
+        const add = (tone, kind, r, title, detail, sortDate) => todos.push({ key: `${kind}-${r.client.id}`, tone, kind, client: r.client, title, detail, sortDate: sortDate || r.date || '9999' })
+        const fmt = (iso) => formatDate(iso, lng, { month: 'short', day: 'numeric' })
 
-            setStats(prev => ({ 
-                ...prev,
-                clients: totalClients, 
-                todayEvents: todayCount,
-                leads, tastings, proposals, sold
-            }))
-        }
-    }
+        booked.forEach(r => {
+            const sd = r.client.service_data || {}
+            if (r.date >= weekStart && r.date <= weekEnd) {
+                week.events += 1
+                week.guests += toNumber(sd.guest_count)
+            }
+            if (r.date.startsWith(monthPrefix)) cash.bookedThisMonth += toNumber(r.client.job_price)
 
-    function recalculateRevenue(scope, clients) {
-        const now = new Date()
-        const startOfYear = new Date(now.getFullYear(), 0, 1)
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-        
-        const startOfWeek = new Date(now)
-        startOfWeek.setDate(now.getDate() - now.getDay())
-        startOfWeek.setHours(0,0,0,0)
+            const pay = paymentSummary(r.client, today)
+            cash.owed += pay.balance
+            if (pay.overdueAmount > 0) {
+                cash.overdue += pay.overdueAmount
+                cash.overdueClients += 1
+                const oldest = pay.dues.find(x => x.late)
+                add('red', 'overdue', r, t('home.todo.overdue', { amount: money(pay.overdueAmount) }), t('home.todo.wasDue', { date: fmt(oldest.date) }), oldest.date)
+            }
+            const soon = pay.dues.filter(x => !x.late && x.date && x.date <= in7)
+            if (soon.length) {
+                add('amber', 'due', r, t('home.todo.dueSoon', { amount: money(soon.reduce((s, x) => s + x.amount, 0)) }), t('home.todo.dueOn', { date: fmt(soon[0].date) }), soon[0].date)
+            }
+            pay.dues.forEach(x => {
+                if (x.late || !x.date) return
+                if (x.date <= weekEnd) week.due += x.amount
+                if (x.date <= in30) cash.dueSoon += x.amount
+            })
 
-        const todayStr = now.toISOString().split('T')[0]
-
-        const filteredClients = clients.filter(c => {
-            const dateStr = c.service_data?.event_date || c.service_data?.service_date || c.created_at
-            if (!dateStr) return false
-            const date = new Date(dateStr)
-
-            if (scope === 'all') return true
-            if (scope === 'year') return date >= startOfYear
-            if (scope === 'month') return date >= startOfMonth
-            if (scope === 'week') return date >= startOfWeek
-            if (scope === 'day') return dateStr.startsWith(todayStr)
-            return true
+            // Booked events coming up soon that are missing details
+            if (r.date >= today && r.date <= in14) {
+                const missing = []
+                if (!ALL_MENU_FIELDS.some(f => Array.isArray(sd[f]) && sd[f].length)) missing.push(t('home.missing.menu'))
+                if (!toNumber(sd.guest_count)) missing.push(t('home.missing.guests'))
+                if (!sd.event_time) missing.push(t('home.missing.time'))
+                if (!r.client.address?.trim()) missing.push(t('home.missing.address'))
+                if (toNumber(r.client.job_price) > 0 && !(sd.payment_plan || []).length) missing.push(t('home.missing.schedule'))
+                if (!r.client.contract_url) missing.push(t('home.missing.contract'))
+                if (missing.length) add('amber', 'missing', r, t('home.todo.missing', { list: missing.join(', ') }), t('home.todo.eventOn', { date: fmt(r.date) }))
+            }
         })
 
-        const newTotal = filteredClients.reduce((sum, c) => sum + (parseFloat(c.job_price) || 0), 0)
-        setStats(prev => ({ ...prev, revenueDisplay: newTotal }))
-    }
+        // Pipeline: open quotes for dates that haven't passed
+        const stages = Object.fromEntries(OPEN_STAGES.map(s => [s, { count: 0, value: 0 }]))
+        let undated = 0
+        rows.filter(r => OPEN_STAGES.includes(r.status)).forEach(r => {
+            if (!r.date) { undated += 1; return }
+            if (r.date < today) return
+            stages[r.status].count += 1
+            stages[r.status].value += toNumber(r.client.job_price)
 
-    async function fetchWeather(city) {
-        try {
-            const queryCity = city || 'Los Angeles'
-            const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${queryCity}&count=1&language=en&format=json`)
-            const geoData = await geoRes.json()
-            
-            if (geoData.results) {
-                const { latitude, longitude } = geoData.results[0]
-                const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&temperature_unit=fahrenheit`)
-                const weatherData = await weatherRes.json()
-                setWeather({ 
-                    temp: Math.round(weatherData.current_weather.temperature), 
-                    condition: 'Clear' 
-                })
+            if (r.status === 'proposal' && !r.client.contract_url) {
+                add('blue', 'proposal', r, t('home.todo.proposal'), t('home.todo.eventOn', { date: fmt(r.date) }))
+            } else if (r.date <= in30) {
+                add('blue', 'unbooked', r, t('home.todo.unbooked', { stage: t(`status.${r.status}`), count: daysBetween(today, r.date) }), t('home.todo.eventOn', { date: fmt(r.date) }))
             }
-        } catch (e) { console.error("Weather error", e) }
+        })
+        const pipeline = {
+            stages,
+            undated,
+            count: OPEN_STAGES.reduce((s, k) => s + stages[k].count, 0),
+            value: OPEN_STAGES.reduce((s, k) => s + stages[k].value, 0),
+        }
+
+        todos.sort((a, b) => TONE_ORDER[a.tone] - TONE_ORDER[b.tone] || a.sortDate.localeCompare(b.sortDate))
+        return { todayEvents, nextUp: upcoming[0] || null, week, cash, todos, pipeline }
+    }, [clients, today, t, lng])
+
+    const openClient = (id) => navigate(`/clients?id=${id}`)
+
+    async function newClient(serviceData) {
+        setBusy(true)
+        const id = await createLead(t, serviceData)
+        setBusy(false)
+        if (id) openClient(id)
     }
 
-    const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+    function pickNewEventDate() {
+        try { newDateRef.current.showPicker() } catch { navigate('/calendar') }
+    }
+
     const hour = new Date().getHours()
-    const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
-    const businessName = user?.user_metadata?.business_name || 'Partner'
-
-    const scopeLabels = {
-        'all': 'All Time',
-        'year': 'This Year',
-        'month': 'This Month',
-        'week': 'This Week',
-        'day': 'Today'
-    }
+    const greetingKey = hour < 12 ? 'home.morning' : hour < 18 ? 'home.afternoon' : 'home.evening'
+    const businessName = user?.user_metadata?.business_name
+    const todos = showAllTodos ? d.todos : d.todos.slice(0, 6)
+    const ICONS = { overdue: DollarSign, due: DollarSign, missing: AlertTriangle, proposal: FileSignature, unbooked: UserRound }
 
     return (
-        <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'sans-serif' }}>
-            
-            {/* --- HERO SECTION --- */}
-            <div className="hero-section" style={{ 
-                marginBottom: '30px', 
-                background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', 
-                borderRadius: '16px', color: 'white', padding: '40px',
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2)'
-            }}>
-                <div>
-                    <div style={{ fontSize: '14px', opacity: 0.8, marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '1px' }}>{dateStr}</div>
-                    <h1 style={{ margin: 0, fontSize: '36px', fontWeight: '800' }}>{greeting}, <span style={{color: '#60a5fa'}}>{businessName}</span>.</h1>
-                </div>
-                <div className="weather-widget" style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', padding: '15px 25px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '15px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                    <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '32px', fontWeight: 'bold' }}>{weather.temp}°</div>
-                        <div style={{ fontSize: '12px', opacity: 0.8 }}>{user?.user_metadata?.city || 'Local Weather'}</div>
-                    </div>
-                    <Sun size={40} color="#fbbf24" />
-                </div>
-            </div>
+        <div className="min-h-[calc(100vh-60px)] bg-slate-50 font-sans">
+            <div className="mx-auto max-w-6xl px-4 py-5 md:px-6 md:py-8">
 
-            {/* --- METRICS GRID --- */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '30px' }}>
-                
-                {/* 1. REVENUE */}
-                <div style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
-                        <div style={{ background: '#dcfce7', padding: '10px', borderRadius: '8px', color: '#16a34a' }}><DollarSign size={24} /></div>
-                        
-                        <div style={{position: 'relative'}}>
-                            <select 
-                                value={revenueScope}
-                                onChange={(e) => setRevenueScope(e.target.value)}
-                                style={{
-                                    appearance: 'none',
-                                    background: '#f1f5f9', border: 'none', padding: '5px 25px 5px 10px',
-                                    borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', color: '#475569',
-                                    cursor: 'pointer', outline: 'none'
-                                }}
-                            >
-                                <option value="year">Yearly</option>
-                                <option value="month">Monthly</option>
-                                <option value="week">Weekly</option>
-                                <option value="day">Daily</option>
-                                <option value="all">All Time</option>
-                            </select>
-                            <ChevronDown size={12} style={{position:'absolute', right:'8px', top:'8px', color:'#64748b', pointerEvents:'none'}}/>
+                {/* HEADER + QUICK ACTIONS */}
+                <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+                    <div>
+                        <div className="text-sm font-semibold text-slate-500 first-letter:uppercase">{formatDate(today, lng, { weekday: 'long', month: 'long', day: 'numeric' })}</div>
+                        <h1 className="text-2xl font-extrabold text-slate-900 md:text-3xl">
+                            {businessName ? t(greetingKey, { name: businessName }) : t(`${greetingKey}Plain`)}
+                        </h1>
+                    </div>
+                    <div className="flex w-full gap-2 sm:w-auto">
+                        <button onClick={() => newClient({})} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-blue-600 px-2 py-2.5 sm:px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60 sm:flex-none">
+                            {busy ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}{t('home.newClient')}
+                        </button>
+                        <div className="relative flex flex-1 sm:flex-none">
+                            <button onClick={pickNewEventDate} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-2 py-2.5 sm:px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+                                <CalendarPlus size={16} />{t('calendar.newEvent')}
+                            </button>
+                            <input ref={newDateRef} type="date" tabIndex={-1} aria-hidden="true" onChange={e => isoDay(e.target.value) && newClient({ event_date: e.target.value })} className="pointer-events-none absolute bottom-0 right-0 h-px w-px opacity-0" />
                         </div>
-                    </div>
-                    
-                    <div style={{ color: '#64748b', fontSize: '14px', fontWeight: 'bold' }}>Revenue ({scopeLabels[revenueScope]})</div>
-                    <div style={{ fontSize: '32px', fontWeight: '900', color: '#1e293b' }}>
-                        ${stats.revenueDisplay.toLocaleString()}
-                    </div>
-                </div>
-
-                {/* 2. CLIENTS */}
-                <div onClick={() => navigate('/clients')} style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', cursor:'pointer' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
-                        <div style={{ background: '#dbeafe', padding: '10px', borderRadius: '8px', color: '#2563EB' }}><Users size={24} /></div>
-                    </div>
-                    <div style={{ color: '#64748b', fontSize: '14px', fontWeight: 'bold' }}>Total Clients</div>
-                    <div style={{ fontSize: '32px', fontWeight: '900', color: '#1e293b' }}>{stats.clients}</div>
-                </div>
-
-                {/* 3. TODAY'S EVENTS */}
-                <div style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
-                        <div style={{ background: '#fef3c7', padding: '10px', borderRadius: '8px', color: '#d97706' }}><Calendar size={24} /></div>
-                        <button onClick={() => navigate('/calendar')} style={{ background: 'none', border: 'none', color: '#2563EB', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            View Schedule <ArrowRight size={14} />
+                        <button onClick={() => navigate('/calendar')} className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-2 py-2.5 sm:px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 sm:flex-none">
+                            <CalendarDays size={16} />{t('nav.calendar')}
                         </button>
                     </div>
-                    <div style={{ color: '#64748b', fontSize: '14px', fontWeight: 'bold' }}>Events Today</div>
-                    <div style={{ fontSize: '32px', fontWeight: '900', color: '#1e293b' }}>{stats.todayEvents}</div>
                 </div>
 
-            </div>
+                {loading ? (
+                    <div className="flex items-center justify-center gap-2 py-24 text-slate-400"><Loader2 size={20} className="animate-spin" />{t('common.loading')}</div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                        {/* LEFT: today + to-dos */}
+                        <div className="min-w-0 space-y-4 lg:col-span-2">
+                            <Card title={d.todayEvents.length ? t('home.todayTitle', { count: d.todayEvents.length }) : t('home.nextUp')} action={<LinkButton onClick={() => navigate('/calendar')}>{t('nav.calendar')}</LinkButton>}>
+                                {d.todayEvents.length > 0 ? (
+                                    <div className="divide-y divide-slate-100 pb-1">
+                                        {d.todayEvents.map(r => <EventBlock key={r.client.id} client={r.client} today={today} onOpen={() => openClient(r.client.id)} onLoadout={() => navigate(`/loadout?date=${r.date}`)} />)}
+                                    </div>
+                                ) : d.nextUp ? (
+                                    <>
+                                        <div className="px-4 text-sm text-slate-500 md:px-5">{t('home.noEventsToday')}</div>
+                                        <EventBlock client={d.nextUp.client} today={today} big onOpen={() => openClient(d.nextUp.client.id)} onLoadout={() => navigate(`/loadout?date=${d.nextUp.date}`)} />
+                                    </>
+                                ) : (
+                                    <div className="px-5 pb-6 pt-2 text-slate-500">{t('home.nothingUpcoming')}</div>
+                                )}
+                                {d.todayEvents.length > 0 && d.nextUp && (
+                                    <button onClick={() => openClient(d.nextUp.client.id)} className="flex w-full items-center gap-2 border-t border-slate-100 px-4 py-3 text-left text-sm text-slate-600 hover:bg-slate-50 md:px-5">
+                                        <span className="font-semibold text-slate-500">{t('home.after')}</span>
+                                        <span className="min-w-0 flex-1 truncate">{formatDate(d.nextUp.date, lng, { weekday: 'short', month: 'short', day: 'numeric' })} · {d.nextUp.client.full_name}</span>
+                                        <ChevronRight size={16} className="text-slate-300" />
+                                    </button>
+                                )}
+                            </Card>
 
-            {/* --- PIPELINE PULSE --- */}
-            <div style={{ background: 'white', padding: '30px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', flexDirection:'column', gap:'20px' }}>
-                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                        <div style={{ background: '#f3e8ff', padding: '12px', borderRadius: '50%', color: '#9333ea' }}><Activity size={24}/></div>
-                        <div>
-                            <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>Pipeline Pulse</h3>
-                            <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#64748b' }}>Live snapshot of your sales funnel.</p>
+                            <Card title={t('home.attention')} action={d.todos.length > 0 && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">{d.todos.length}</span>}>
+                                {d.todos.length === 0 ? (
+                                    <div className="flex items-center gap-2 px-5 pb-5 pt-1 text-sm font-semibold text-green-700"><CheckCircle2 size={18} />{t('home.allCaughtUp')}</div>
+                                ) : (
+                                    <div className="divide-y divide-slate-100">
+                                        {todos.map(item => {
+                                            const Icon = ICONS[item.kind]
+                                            return (
+                                                <button key={item.key} onClick={() => openClient(item.client.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50 md:px-5">
+                                                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${TONE[item.tone].icon}`}><Icon size={17} /></span>
+                                                    <span className="min-w-0 flex-1">
+                                                        <span className="flex items-center gap-2">
+                                                            <span className="truncate font-semibold text-slate-900">{item.client.full_name || '—'}</span>
+                                                            {item.kind === 'unbooked' || item.kind === 'proposal' ? <StatusBadge status={item.client.status} small /> : null}
+                                                        </span>
+                                                        <span className={`block truncate text-sm ${TONE[item.tone].text}`}>{item.title} · <span className="text-slate-500">{item.detail}</span></span>
+                                                    </span>
+                                                    <ChevronRight size={18} className="shrink-0 text-slate-300" />
+                                                </button>
+                                            )
+                                        })}
+                                        {d.todos.length > 6 && (
+                                            <button onClick={() => setShowAllTodos(v => !v)} className="w-full px-5 py-3 text-center text-sm font-semibold text-blue-600 hover:bg-slate-50">
+                                                {showAllTodos ? t('home.showLess') : t('home.showAll', { count: d.todos.length })}
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </Card>
+                        </div>
+
+                        {/* RIGHT: week, money, pipeline */}
+                        <div className="min-w-0 space-y-4">
+                            <section className="rounded-2xl bg-slate-900 p-4 text-white md:p-5">
+                                <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">{t('calendar.thisWeek')}</h2>
+                                <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                                    <div><div className="text-2xl font-extrabold">{d.week.events}</div><div className="text-xs text-slate-400">{t('home.events')}</div></div>
+                                    <div><div className="text-2xl font-extrabold">{d.week.guests}</div><div className="text-xs text-slate-400">{t('home.guests')}</div></div>
+                                    <div><div className="text-2xl font-extrabold">{money(d.week.due)}</div><div className="text-xs text-slate-400">{t('home.due')}</div></div>
+                                </div>
+                            </section>
+
+                            <Card title={t('home.money')} action={<LinkButton onClick={() => navigate('/invoices')}>{t('nav.invoices')}</LinkButton>}>
+                                <dl className="divide-y divide-slate-100 px-4 pb-2 md:px-5">
+                                    {[
+                                        [t('home.overdue'), d.cash.overdue, d.cash.overdue > 0 ? 'text-red-600' : 'text-slate-900', d.cash.overdueClients > 0 ? t('home.clientsCount', { count: d.cash.overdueClients }) : null],
+                                        [t('home.dueNext30'), d.cash.dueSoon, 'text-slate-900'],
+                                        [t('home.stillOwed'), d.cash.owed, 'text-slate-900'],
+                                        [t('home.bookedThisMonth'), d.cash.bookedThisMonth, 'text-green-700'],
+                                    ].map(([label, value, color, note]) => (
+                                        <div key={label} className="flex items-baseline justify-between gap-3 py-2.5">
+                                            <dt className="text-sm text-slate-600">{label}{note && <span className="ml-1.5 text-xs text-slate-400">· {note}</span>}</dt>
+                                            <dd className={`font-extrabold tabular-nums ${color}`}>{money(value)}</dd>
+                                        </div>
+                                    ))}
+                                </dl>
+                            </Card>
+
+                            <Card title={t('home.pipeline')} action={<LinkButton onClick={() => navigate('/clients')}>{t('nav.directory')}</LinkButton>}>
+                                <div className="px-4 pb-4 md:px-5">
+                                    <div className="text-2xl font-extrabold text-slate-900">{money(d.pipeline.value)}</div>
+                                    <div className="text-sm text-slate-500">{t('home.openQuotes', { count: d.pipeline.count })}</div>
+                                    <div className="mt-3 space-y-2">
+                                        {OPEN_STAGES.map(s => (
+                                            <div key={s} className="flex items-center justify-between gap-2 text-sm">
+                                                <StatusBadge status={s} small />
+                                                <span className="flex-1 text-slate-500">{d.pipeline.stages[s].count}</span>
+                                                <span className="font-semibold tabular-nums text-slate-800">{money(d.pipeline.stages[s].value)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {d.pipeline.undated > 0 && <div className="mt-3 text-xs text-slate-400">{t('home.undated', { count: d.pipeline.undated })}</div>}
+                                </div>
+                            </Card>
                         </div>
                     </div>
-                    <button onClick={() => navigate('/analytics')} style={{ color: '#64748b', background:'none', border:'none', cursor:'pointer', fontWeight:'bold', fontSize:'13px' }}>View Full Report →</button>
-                </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px', marginTop:'10px' }}>
-                    <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #94a3b8' }}>
-                        <div style={{fontSize:'12px', fontWeight:'bold', color:'#64748b', marginBottom:'5px', display:'flex', alignItems:'center', gap:'5px'}}><Users size={14}/> LEADS</div>
-                        <div style={{fontSize:'24px', fontWeight:'900', color:'#334155'}}>{stats.leads}</div>
-                    </div>
-                    <div style={{ background: '#eff6ff', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #2563EB' }}>
-                        <div style={{fontSize:'12px', fontWeight:'bold', color:'#2563EB', marginBottom:'5px', display:'flex', alignItems:'center', gap:'5px'}}><Clock size={14}/> TASTINGS</div>
-                        <div style={{fontSize:'24px', fontWeight:'900', color:'#1e3a8a'}}>{stats.tastings}</div>
-                    </div>
-                    <div style={{ background: '#fff7ed', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #f97316' }}>
-                        <div style={{fontSize:'12px', fontWeight:'bold', color:'#c2410c', marginBottom:'5px', display:'flex', alignItems:'center', gap:'5px'}}><FileText size={14}/> PROPOSALS</div>
-                        <div style={{fontSize:'24px', fontWeight:'900', color:'#7c2d12'}}>{stats.proposals}</div>
-                    </div>
-                    <div style={{ background: '#f0fdf4', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #16a34a' }}>
-                        <div style={{fontSize:'12px', fontWeight:'bold', color:'#15803d', marginBottom:'5px', display:'flex', alignItems:'center', gap:'5px'}}><CheckCircle size={14}/> BOOKED</div>
-                        <div style={{fontSize:'24px', fontWeight:'900', color:'#14532d'}}>{stats.sold}</div>
-                    </div>
-                </div>
+                )}
             </div>
-
-            <style>{`
-                @media (max-width: 600px) {
-                    .hero-section { flex-direction: column; text-align: center; gap: 20px; }
-                    .weather-widget { width: 100%; justify-content: center; }
-                }
-            `}</style>
-
         </div>
     )
 }
