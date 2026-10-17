@@ -79,7 +79,7 @@ export default function MenuSheet({ client, setClient, menuLibrary, onMenuItemCr
                     <div className="space-y-3">
                         {chosen.groups.map(g => (
                             <div key={g.key}>
-                                <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">{t(`menu.category.${g.key}`)}</div>
+                                <div className="mb-1.5 text-sm font-semibold text-slate-500">{t(`menu.category.${g.key}`)}</div>
                                 <div className="flex flex-wrap gap-2">
                                     {g.items.map(name => (
                                         <button key={name} onClick={() => toggle(name, g.field)} className="flex items-center gap-1.5 rounded-full bg-blue-600 py-1.5 pl-3 pr-2 text-sm font-medium text-white active:bg-blue-800" aria-label={`${t('common.remove')} ${name}`}>

@@ -12,7 +12,7 @@ export default function StatusBadge({ status, small }) {
     const { t } = useTranslation()
     const s = PIPELINE.includes(status) ? status : 'lead'
     return (
-        <span className={`shrink-0 rounded-full font-bold uppercase tracking-wide ${COLORS[s]} ${small ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs'}`}>
+        <span className={`shrink-0 rounded-full font-bold ${COLORS[s]} ${small ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-sm'}`}>
             {t(`status.${s}`)}
         </span>
     )

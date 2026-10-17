@@ -35,7 +35,7 @@ export default function NotesSheet({ client, setClient }) {
             <Card
                 title={t('event.timeline')}
                 action={
-                    <button onClick={() => setTimeline([...timeline, { time: '', action: '' }])} className="flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-bold text-blue-600 hover:bg-blue-50">
+                    <button onClick={() => setTimeline([...timeline, { time: '', action: '' }])} className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-bold text-blue-600 hover:bg-blue-50">
                         <Plus size={16} /> {t('event.addTime')}
                     </button>
                 }

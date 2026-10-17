@@ -20,7 +20,7 @@ function ruleText(t, e) {
 function GearForm({ value, onChange }) {
     const { t } = useTranslation()
     const set = (patch) => onChange({ ...value, ...patch })
-    const label = 'mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500'
+    const label = 'mb-1 block text-sm font-semibold text-slate-700'
     return (
         <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
             <label className="block">
@@ -173,7 +173,7 @@ export default function Equipment() {
         .filter(g => g.items.length)
 
     return (
-        <div className="min-h-[calc(100vh-60px)] bg-slate-50 font-sans">
+        <div className="bg-slate-50 font-sans">
             <div className="mx-auto max-w-3xl px-4 py-5 md:py-8">
                 <button onClick={() => navigate('/day?tab=loadout')} className="-ml-2 mb-2 flex items-center gap-1 rounded-lg p-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">
                     <ArrowLeft size={18} />{t('loadout.title')}
@@ -206,7 +206,7 @@ export default function Equipment() {
                             if (!rows.length) return null
                             return (
                                 <div key={cat} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                                    <div className="bg-slate-50 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">{t(`loadout.category.${cat}`)}</div>
+                                    <div className="bg-slate-50 px-4 py-1.5 text-sm font-semibold text-slate-500">{t(`loadout.category.${cat}`)}</div>
                                     {rows.map(g => (
                                         <button key={g.id} onClick={() => setEditing({ ...g, stock: g.stock ?? '' })} className="flex w-full items-center gap-3 border-t border-slate-100 px-4 py-3 text-left first:border-0 hover:bg-slate-50">
                                             <span className="min-w-0 flex-1">
@@ -234,7 +234,7 @@ export default function Equipment() {
                                 </div>
                                 {menuGroups.map(group => (
                                     <div key={group.key} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                                        <div className="bg-slate-50 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">{t(`menu.category.${group.key}`)}</div>
+                                        <div className="bg-slate-50 px-4 py-1.5 text-sm font-semibold text-slate-500">{t(`menu.category.${group.key}`)}</div>
                                         {group.items.map(s => {
                                             const own = links.filter(l => l.service_id === s.id)
                                             const free = gear.filter(g => !own.some(l => l.equipment_id === g.id))

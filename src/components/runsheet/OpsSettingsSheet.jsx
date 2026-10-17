@@ -6,7 +6,7 @@ import { TRUCK_COLORS, TRUCK_COLOR_KEYS } from '../../lib/runsheet'
 import { inputClass } from '../clients/styles'
 import Sheet from '../clients/Sheet'
 
-const label = 'mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500'
+const label = 'mb-1 block text-sm font-semibold text-slate-700'
 
 // Kitchen address, default timings and the list of trucks
 export default function OpsSettingsSheet({ settings, trucks, onSettings, onTrucks, onClose }) {
@@ -104,7 +104,7 @@ export default function OpsSettingsSheet({ settings, trucks, onSettings, onTruck
                 </div>
 
                 <div className="rounded-xl border border-slate-200 bg-white">
-                    <div className="px-4 pb-1 pt-3 text-xs font-bold uppercase tracking-wide text-slate-500">{t('day.settings.trucks')}</div>
+                    <div className="px-4 pb-1 pt-3 text-sm font-bold text-slate-500">{t('day.settings.trucks')}</div>
                     {trucks.map(truck => (
                         <div key={truck.id} className="flex items-center gap-2 border-b border-slate-100 px-4 py-2.5">
                             <div className="flex gap-1">

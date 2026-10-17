@@ -1,3 +1,13 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Slightly larger text everywhere: easier to read at a glance */
+html { font-size: 17px; }
+
+/* Height left for a page that fills the screen (Clients split view):
+   phones lose the top bar and the bottom menu, desktop loses nothing */
+.app-viewport { height: calc(100dvh - 3.5rem - 4rem - env(safe-area-inset-bottom)); }
+@media (min-width: 768px) {
+    .app-viewport { height: 100dvh; }
+}

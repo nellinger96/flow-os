@@ -2,11 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
-    AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Clock, DollarSign, List, Loader2,
-    MapPin, MessageSquare, Phone, Plus, Printer, ShoppingBag, Truck, Users,
+    AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Clock, DollarSign, List, Loader2, MapPin, MessageSquare, Phone, Plus, Printer, ShoppingBag, Truck,
 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { dialable, formatDate, formatTime, formatTimeRange, money, toNumber, todayISO } from '../lib/format'
+import { dialable, formatDate, formatTime, formatTimeRange, money, toNumber, todayISO, upperFirst } from '../lib/format'
 import { PIPELINE } from '../lib/status'
 import { isoDay as isoDate, paymentSummary } from '../lib/payments'
 import { createLead } from '../lib/clients'
@@ -34,12 +33,12 @@ function writePref(key, value) {
 
 function Segmented({ value, onChange, options }) {
     return (
-        <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
+        <div className="flex rounded-xl border border-slate-200 bg-white p-0.5">
             {options.map(([key, label, Icon]) => (
                 <button
                     key={key}
                     onClick={() => onChange(key)}
-                    className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition ${value === key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                    className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-bold transition ${value === key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                     {Icon && <Icon size={15} />}{label}
                 </button>
@@ -130,7 +129,7 @@ export default function CalendarPage() {
     const [cursor, setCursor] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) })
     const [view, setView] = useState(() => readPref('calendar.view', window.matchMedia('(min-width: 768px)').matches ? 'month' : 'list'))
     const [filter, setFilter] = useState(() => readPref('calendar.filter', 'all'))
-    const [showPayments, setShowPayments] = useState(() => readPref('calendar.payments', 'on') === 'on')
+    const showPayments = true
     const [openDay, setOpenDay] = useState(null)
     const [groceryFor, setGroceryFor] = useState(null)
     const [dragOver, setDragOver] = useState(null)
@@ -153,7 +152,6 @@ export default function CalendarPage() {
 
     const changeView = (v) => { setView(v); writePref('calendar.view', v) }
     const changeFilter = (f) => { setFilter(f); writePref('calendar.filter', f) }
-    const togglePayments = () => setShowPayments(on => { writePref('calendar.payments', on ? 'off' : 'on'); return !on })
 
     // Week runs Sunday to Saturday, matching the grid
     const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay())
@@ -277,63 +275,45 @@ export default function CalendarPage() {
     const panel = openDay ? dayInfo(openDay) : null
 
     return (
-        <div className="min-h-[calc(100vh-60px)] bg-slate-50 font-sans">
+        <div className="bg-slate-50 font-sans">
             <div className="mx-auto max-w-7xl px-4 py-4 md:px-6 md:py-6">
 
-                {/* THIS WEEK */}
-                <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm text-white">
-                    <span className="text-xs font-bold uppercase tracking-wide text-slate-400">{t('calendar.thisWeek')}</span>
-                    {data.week.events === 0 ? (
-                        <span className="text-slate-300">{t('calendar.nothingThisWeek')}</span>
-                    ) : (
-                        <>
-                            <span className="flex items-center gap-1.5"><CalendarDays size={15} className="text-green-400" />{t('calendar.bookedEvents', { count: data.week.events })}</span>
-                            <span className="flex items-center gap-1.5"><Users size={15} className="text-blue-300" />{t('clients.guestsShort', { count: data.week.guests })}</span>
-                        </>
-                    )}
-                    {data.week.due > 0 && <span className="flex items-center gap-1.5"><DollarSign size={15} className="text-amber-300" />{t('calendar.dueThisWeek', { amount: money(data.week.due) })}</span>}
-                    {data.overdue > 0 && (
-                        <button onClick={() => navigate('/invoices')} className="ml-auto flex items-center gap-1.5 rounded-full bg-red-500/20 px-3 py-1 font-semibold text-red-300 hover:bg-red-500/30">
-                            <AlertTriangle size={14} />{t('calendar.overdue', { amount: money(data.overdue) })}
-                        </button>
-                    )}
-                </div>
-
-                {/* HEADER */}
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => shiftMonth(-1)} className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50" aria-label={t('calendar.prevMonth')}><ChevronLeft size={18} /></button>
-                        <button onClick={() => shiftMonth(1)} className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50" aria-label={t('calendar.nextMonth')}><ChevronRight size={18} /></button>
-                        <h1 className="ml-1 text-xl font-extrabold text-slate-900 first-letter:uppercase md:text-2xl">{formatDate(cursor, lng, { month: 'long', year: 'numeric' })}</h1>
-                        <button onClick={goToday} className="ml-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">{t('calendar.today')}</button>
+                {/* MONTH */}
+                <div className="mb-3 flex items-center justify-between gap-2">
+                    <button onClick={() => shiftMonth(-1)} className="rounded-xl border border-slate-200 bg-white p-3 text-slate-600 hover:bg-slate-50" aria-label={t('calendar.prevMonth')}><ChevronLeft size={20} /></button>
+                    <h1 className="flex items-center gap-2 text-2xl font-extrabold text-slate-900">
+                        {upperFirst(formatDate(cursor, lng, { month: 'long', year: 'numeric' }))}
                         {(loading || busy) && <Loader2 size={18} className="animate-spin text-slate-400" />}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
+                    </h1>
+                    <button onClick={() => shiftMonth(1)} className="rounded-xl border border-slate-200 bg-white p-3 text-slate-600 hover:bg-slate-50" aria-label={t('calendar.nextMonth')}><ChevronRight size={20} /></button>
+                </div>
+
+                {/* VIEW + NEW */}
+                <div className="mb-3 flex items-center gap-2">
+                    <div className="min-w-0 flex-1 sm:flex-none">
                         <Segmented value={view} onChange={changeView} options={[['month', t('calendar.month'), CalendarDays], ['list', t('calendar.list'), List]]} />
-                        <Segmented value={filter} onChange={changeFilter} options={[['all', t('calendar.allEvents')], ['booked', t('calendar.bookedOnly')]]} />
-                        <button
-                            onClick={togglePayments}
-                            aria-pressed={showPayments}
-                            className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold ${showPayments ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-500'}`}
-                        >
-                            <DollarSign size={15} />{t('calendar.payments')}
+                    </div>
+                    <button onClick={goToday} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">{t('calendar.today')}</button>
+                    <div className="relative sm:ml-auto">
+                        <button onClick={pickNewDate} disabled={busy} className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60">
+                            <Plus size={18} /><span className="hidden sm:inline">{t('calendar.newEvent')}</span>
                         </button>
-                        <div className="relative">
-                            <button onClick={pickNewDate} disabled={busy} className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60">
-                                <Plus size={16} />{t('calendar.newEvent')}
-                            </button>
-                            <input ref={newDateRef} type="date" tabIndex={-1} aria-hidden="true" onChange={e => createOn(e.target.value)} className="pointer-events-none absolute bottom-0 right-0 h-px w-px opacity-0" />
-                        </div>
+                        <input ref={newDateRef} type="date" tabIndex={-1} aria-hidden="true" onChange={e => createOn(e.target.value)} className="pointer-events-none absolute bottom-0 right-0 h-px w-px opacity-0" />
                     </div>
                 </div>
 
-                {/* LEGEND */}
-                <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-                    {PIPELINE.filter(s => filter === 'all' || s === 'sold').map(s => (
-                        <span key={s} className="flex items-center gap-1.5"><span className={`h-2.5 w-2.5 rounded-full ${DOT[s]}`} />{t(`status.${s}`)}</span>
-                    ))}
-                    {showPayments && <span className="flex items-center gap-1.5"><DollarSign size={12} className="text-amber-600" />{t('calendar.paymentDue')}</span>}
-                    {view === 'month' && <span className="hidden md:inline">· {t('calendar.dragHint')}</span>}
+                {/* SHOW ONLY BOOKED + COLORS */}
+                <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
+                    <label className="flex cursor-pointer items-center gap-2 py-2 font-semibold">
+                        <input type="checkbox" checked={filter === 'booked'} onChange={e => changeFilter(e.target.checked ? 'booked' : 'all')} className="h-5 w-5 rounded border-slate-300 accent-blue-600" />
+                        {t('calendar.bookedOnly')}
+                    </label>
+                    <span className="hidden items-center gap-x-4 md:flex">
+                        {PIPELINE.filter(s => filter === 'all' || s === 'sold').map(s => (
+                            <span key={s} className="flex items-center gap-1.5"><span className={`h-2.5 w-2.5 rounded-full ${DOT[s]}`} />{t(`status.${s}`)}</span>
+                        ))}
+                        <span className="flex items-center gap-1.5"><DollarSign size={13} className="text-amber-600" />{t('calendar.paymentDue')}</span>
+                    </span>
                 </div>
 
                 {view === 'month' ? (
@@ -417,7 +397,7 @@ export default function CalendarPage() {
                                     <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2">
                                         <span className="text-sm inline-block font-bold text-slate-900 first-letter:uppercase">
                                             {formatDate(iso, lng, { weekday: 'long', month: 'short', day: 'numeric' })}
-                                            {iso === today && <span className="ml-2 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">{t('calendar.today')}</span>}
+                                            {iso === today && <span className="ml-2 rounded-full bg-blue-600 px-2 py-0.5 text-xs font-bold text-white">{t('calendar.today')}</span>}
                                         </span>
                                         <span className="flex items-center gap-2 text-xs text-slate-500">
                                             {d.conflict && <span className="flex items-center gap-1 font-semibold text-red-600"><AlertTriangle size={13} />{t('calendar.doubleBookedShort')}</span>}
@@ -492,13 +472,13 @@ export default function CalendarPage() {
 
                         {panel.payments.length > 0 && (
                             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                                <div className="border-b border-slate-100 px-4 py-2 text-xs font-bold uppercase tracking-wide text-slate-500">{t('calendar.paymentsDue')}</div>
+                                <div className="border-b border-slate-100 px-4 py-2 text-sm font-bold text-slate-500">{t('calendar.paymentsDue')}</div>
                                 {panel.payments.map(p => (
                                     <button key={p.key} onClick={() => openClient(p.client.id)} className="flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3 text-left last:border-0 active:bg-slate-50 md:hover:bg-slate-50">
                                         <DollarSign size={16} className={p.late ? 'text-red-600' : 'text-amber-600'} />
                                         <span className="min-w-0 flex-1 truncate font-semibold text-slate-900">{p.client.full_name || '—'}</span>
                                         <span className={`font-bold ${p.late ? 'text-red-700' : 'text-slate-900'}`}>{money(p.amount)}</span>
-                                        {p.late && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase text-red-700">{t('calendar.late')}</span>}
+                                        {p.late && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">{t('calendar.late')}</span>}
                                         <ChevronRight size={16} className="text-slate-300" />
                                     </button>
                                 ))}

@@ -117,7 +117,7 @@ export default function CrewDay() {
     }
 
     const langToggle = (
-        <button onClick={() => i18n.changeLanguage(lng === 'es' ? 'en' : 'es')} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-600">
+        <button onClick={() => i18n.changeLanguage(lng === 'es' ? 'en' : 'es')} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-600">
             {lng === 'es' ? 'English' : 'Español'}
         </button>
     )
@@ -173,7 +173,7 @@ export default function CrewDay() {
                         <h1 className="text-2xl font-extrabold text-slate-900 first-letter:uppercase">{formatDate(data.day, lng, { weekday: 'long', month: 'long', day: 'numeric' })}</h1>
                         <div className="text-sm text-slate-500">
                             {t('calendar.eventsCount', { count: data.events.length })} · {t('crew.hi', { name })}{' '}
-                            <button onClick={() => { setNameDraft(name); setName('') }} className="font-semibold text-blue-600">{t('crew.notYou')}</button>
+                            <button onClick={() => { setNameDraft(name); setName('') }} className="-my-2 py-2 font-semibold text-blue-600">{t('crew.notYou')}</button>
                         </div>
                     </div>
                     {langToggle}

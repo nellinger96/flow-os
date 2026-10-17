@@ -1,16 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
-    AlertTriangle, CalendarDays, CalendarPlus, CheckCircle2, ChevronRight, Clock, DollarSign, FileSignature,
-    Loader2, MapPin, Phone, Printer, Truck, UserPlus, Users, UserRound,
+    AlertTriangle, CalendarDays, CheckCircle2, ChevronRight, Clock, DollarSign, FileSignature, Loader2, MapPin, Phone, Truck, UserPlus, Users, UserRound,
 } from 'lucide-react'
 import { dialable, formatDate, formatTimeRange, money, parseLocalDate, toNumber, todayISO } from '../lib/format'
 import { isoDay, paymentSummary } from '../lib/payments'
 import { createLead } from '../lib/clients'
 import { ALL_MENU_FIELDS } from '../lib/menu'
-import { kitchenSheetHtml, printHtml } from '../lib/printDocs'
 import StatusBadge from '../components/clients/StatusBadge'
 
 const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -34,7 +32,7 @@ function Card({ title, action, children, className = '' }) {
         <section className={`rounded-2xl border border-slate-200 bg-white ${className}`}>
             {(title || action) && (
                 <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-4 md:px-5">
-                    <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">{title}</h2>
+                    <h2 className="text-lg font-bold text-slate-900">{title}</h2>
                     {action}
                 </div>
             )}
@@ -45,7 +43,7 @@ function Card({ title, action, children, className = '' }) {
 
 function LinkButton({ onClick, children }) {
     return (
-        <button onClick={onClick} className="flex items-center gap-0.5 text-sm font-semibold text-blue-600 hover:text-blue-700">
+        <button onClick={onClick} className="-my-2 flex items-center gap-0.5 py-2 text-sm font-semibold text-blue-600 hover:text-blue-700">
             {children}<ChevronRight size={16} />
         </button>
     )
@@ -63,7 +61,7 @@ function EventBlock({ client, today, big, onOpen, onLoadout }) {
     const days = date ? daysBetween(today, date) : null
     const when = days === 0 ? t('home.today') : days === 1 ? t('home.tomorrow') : t('home.inDays', { count: days })
 
-    const btn = 'flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold'
+    const btn = 'flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-bold'
     return (
         <div className="px-4 py-3 md:px-5">
             <div className="flex items-start justify-between gap-3">
@@ -84,11 +82,10 @@ function EventBlock({ client, today, big, onOpen, onLoadout }) {
                 </div>
             )}
             <div className="mt-3 flex flex-wrap gap-2">
-                {place && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`} target="_blank" rel="noreferrer" className={`${btn} bg-blue-50 text-blue-700 hover:bg-blue-100`}><MapPin size={15} />{t('summary.map')}</a>}
-                {phone && <a href={`tel:${phone}`} className={`${btn} bg-blue-50 text-blue-700 hover:bg-blue-100`}><Phone size={15} />{t('summary.call')}</a>}
-                <button onClick={onLoadout} className={`${btn} bg-blue-50 text-blue-700 hover:bg-blue-100`}><Truck size={15} />{t('nav.eventDay')}</button>
-                <button onClick={() => printHtml(kitchenSheetHtml({ client, t, lng }))} className={`${btn} bg-blue-50 text-blue-700 hover:bg-blue-100`}><Printer size={15} />{t('calendar.kitchen')}</button>
                 <button onClick={onOpen} className={`${btn} bg-slate-900 text-white hover:bg-slate-700`}>{t('calendar.openClient')}</button>
+                {days !== null && days <= 1 && <button onClick={onLoadout} className={`${btn} bg-blue-600 text-white hover:bg-blue-700`}><Truck size={16} />{t('nav.eventDay')}</button>}
+                {place && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`} target="_blank" rel="noreferrer" className={`${btn} bg-blue-50 text-blue-700 hover:bg-blue-100`}><MapPin size={16} />{t('summary.map')}</a>}
+                {phone && <a href={`tel:${phone}`} className={`${btn} bg-blue-50 text-blue-700 hover:bg-blue-100`}><Phone size={16} />{t('summary.call')}</a>}
             </div>
         </div>
     )
@@ -103,7 +100,6 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true)
     const [busy, setBusy] = useState(false)
     const [showAllTodos, setShowAllTodos] = useState(false)
-    const newDateRef = useRef(null)
     const navigate = useNavigate()
 
     // --- 1. THE STRIPE CATCHER ---
@@ -252,18 +248,15 @@ export default function Dashboard() {
         if (id) openClient(id)
     }
 
-    function pickNewEventDate() {
-        try { newDateRef.current.showPicker() } catch { navigate('/calendar') }
-    }
 
     const hour = new Date().getHours()
     const greetingKey = hour < 12 ? 'home.morning' : hour < 18 ? 'home.afternoon' : 'home.evening'
     const businessName = user?.user_metadata?.business_name
-    const todos = showAllTodos ? d.todos : d.todos.slice(0, 6)
+    const todos = showAllTodos ? d.todos : d.todos.slice(0, 4)
     const ICONS = { overdue: DollarSign, due: DollarSign, missing: AlertTriangle, proposal: FileSignature, unbooked: UserRound }
 
     return (
-        <div className="min-h-[calc(100vh-60px)] bg-slate-50 font-sans">
+        <div className="bg-slate-50 font-sans">
             <div className="mx-auto max-w-6xl px-4 py-5 md:px-6 md:py-8">
 
                 {/* HEADER + QUICK ACTIONS */}
@@ -274,20 +267,9 @@ export default function Dashboard() {
                             {businessName ? t(greetingKey, { name: businessName }) : t(`${greetingKey}Plain`)}
                         </h1>
                     </div>
-                    <div className="flex w-full gap-2 sm:w-auto">
-                        <button onClick={() => newClient({})} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-blue-600 px-2 py-2.5 sm:px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60 sm:flex-none">
-                            {busy ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}{t('home.newClient')}
-                        </button>
-                        <div className="relative flex flex-1 sm:flex-none">
-                            <button onClick={pickNewEventDate} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-2 py-2.5 sm:px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
-                                <CalendarPlus size={16} />{t('calendar.newEvent')}
-                            </button>
-                            <input ref={newDateRef} type="date" tabIndex={-1} aria-hidden="true" onChange={e => isoDay(e.target.value) && newClient({ event_date: e.target.value })} className="pointer-events-none absolute bottom-0 right-0 h-px w-px opacity-0" />
-                        </div>
-                        <button onClick={() => navigate('/calendar')} className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-2 py-2.5 sm:px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 sm:flex-none">
-                            <CalendarDays size={16} />{t('nav.calendar')}
-                        </button>
-                    </div>
+                    <button onClick={() => newClient({})} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-base font-bold text-white hover:bg-blue-700 disabled:opacity-60 sm:w-auto">
+                        {busy ? <Loader2 size={18} className="animate-spin" /> : <UserPlus size={18} />}{t('home.newClient')}
+                    </button>
                 </div>
 
                 {loading ? (
@@ -318,7 +300,7 @@ export default function Dashboard() {
                                 )}
                             </Card>
 
-                            <Card title={t('home.attention')} action={d.todos.length > 0 && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">{d.todos.length}</span>}>
+                            <Card title={t('home.attention')} action={d.todos.length > 0 && <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-sm font-bold text-red-700">{d.todos.length}</span>}>
                                 {d.todos.length === 0 ? (
                                     <div className="flex items-center gap-2 px-5 pb-5 pt-1 text-sm font-semibold text-green-700"><CheckCircle2 size={18} />{t('home.allCaughtUp')}</div>
                                 ) : (
@@ -326,8 +308,8 @@ export default function Dashboard() {
                                         {todos.map(item => {
                                             const Icon = ICONS[item.kind]
                                             return (
-                                                <button key={item.key} onClick={() => openClient(item.client.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50 md:px-5">
-                                                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${TONE[item.tone].icon}`}><Icon size={17} /></span>
+                                                <button key={item.key} onClick={() => openClient(item.client.id)} className="flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-50 md:px-5">
+                                                    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${TONE[item.tone].icon}`}><Icon size={18} /></span>
                                                     <span className="min-w-0 flex-1">
                                                         <span className="flex items-center gap-2">
                                                             <span className="truncate font-semibold text-slate-900">{item.client.full_name || '—'}</span>
@@ -339,7 +321,7 @@ export default function Dashboard() {
                                                 </button>
                                             )
                                         })}
-                                        {d.todos.length > 6 && (
+                                        {d.todos.length > 4 && (
                                             <button onClick={() => setShowAllTodos(v => !v)} className="w-full px-5 py-3 text-center text-sm font-semibold text-blue-600 hover:bg-slate-50">
                                                 {showAllTodos ? t('home.showLess') : t('home.showAll', { count: d.todos.length })}
                                             </button>
@@ -351,14 +333,13 @@ export default function Dashboard() {
 
                         {/* RIGHT: week, money, pipeline */}
                         <div className="min-w-0 space-y-4">
-                            <section className="rounded-2xl bg-slate-900 p-4 text-white md:p-5">
-                                <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">{t('calendar.thisWeek')}</h2>
-                                <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                                    <div><div className="text-2xl font-extrabold">{d.week.events}</div><div className="text-xs text-slate-400">{t('home.events')}</div></div>
-                                    <div><div className="text-2xl font-extrabold">{d.week.guests}</div><div className="text-xs text-slate-400">{t('home.guests')}</div></div>
-                                    <div><div className="text-2xl font-extrabold">{money(d.week.due)}</div><div className="text-xs text-slate-400">{t('home.due')}</div></div>
+                            <Card title={t('calendar.thisWeek')}>
+                                <div className="grid grid-cols-3 gap-2 px-4 pb-4 text-center md:px-5">
+                                    <div className="rounded-xl bg-slate-50 py-3"><div className="text-2xl font-extrabold text-slate-900">{d.week.events}</div><div className="text-sm text-slate-500">{t('home.events')}</div></div>
+                                    <div className="rounded-xl bg-slate-50 py-3"><div className="text-2xl font-extrabold text-slate-900">{d.week.guests}</div><div className="text-sm text-slate-500">{t('home.guests')}</div></div>
+                                    <div className="rounded-xl bg-slate-50 py-3"><div className="text-2xl font-extrabold text-slate-900">{money(d.week.due)}</div><div className="text-sm text-slate-500">{t('home.due')}</div></div>
                                 </div>
-                            </section>
+                            </Card>
 
                             <Card title={t('home.money')} action={<LinkButton onClick={() => navigate('/invoices')}>{t('nav.invoices')}</LinkButton>}>
                                 <dl className="divide-y divide-slate-100 px-4 pb-2 md:px-5">
@@ -366,32 +347,25 @@ export default function Dashboard() {
                                         [t('home.overdue'), d.cash.overdue, d.cash.overdue > 0 ? 'text-red-600' : 'text-slate-900', d.cash.overdueClients > 0 ? t('home.clientsCount', { count: d.cash.overdueClients }) : null],
                                         [t('home.dueNext30'), d.cash.dueSoon, 'text-slate-900'],
                                         [t('home.stillOwed'), d.cash.owed, 'text-slate-900'],
-                                        [t('home.bookedThisMonth'), d.cash.bookedThisMonth, 'text-green-700'],
                                     ].map(([label, value, color, note]) => (
                                         <div key={label} className="flex items-baseline justify-between gap-3 py-2.5">
-                                            <dt className="text-sm text-slate-600">{label}{note && <span className="ml-1.5 text-xs text-slate-400">· {note}</span>}</dt>
-                                            <dd className={`font-extrabold tabular-nums ${color}`}>{money(value)}</dd>
+                                            <dt className="text-base text-slate-700">{label}{note && <span className="ml-1.5 text-sm text-slate-400">· {note}</span>}</dt>
+                                            <dd className={`text-lg font-extrabold tabular-nums ${color}`}>{money(value)}</dd>
                                         </div>
                                     ))}
                                 </dl>
                             </Card>
 
-                            <Card title={t('home.pipeline')} action={<LinkButton onClick={() => navigate('/clients')}>{t('nav.directory')}</LinkButton>}>
-                                <div className="px-4 pb-4 md:px-5">
-                                    <div className="text-2xl font-extrabold text-slate-900">{money(d.pipeline.value)}</div>
-                                    <div className="text-sm text-slate-500">{t('home.openQuotes', { count: d.pipeline.count })}</div>
-                                    <div className="mt-3 space-y-2">
-                                        {OPEN_STAGES.map(s => (
-                                            <div key={s} className="flex items-center justify-between gap-2 text-sm">
-                                                <StatusBadge status={s} small />
-                                                <span className="flex-1 text-slate-500">{d.pipeline.stages[s].count}</span>
-                                                <span className="font-semibold tabular-nums text-slate-800">{money(d.pipeline.stages[s].value)}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    {d.pipeline.undated > 0 && <div className="mt-3 text-xs text-slate-400">{t('home.undated', { count: d.pipeline.undated })}</div>}
-                                </div>
-                            </Card>
+                            {d.pipeline.count > 0 && (
+                                <button onClick={() => navigate('/clients')} className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left hover:bg-slate-50 md:p-5">
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block text-lg font-bold text-slate-900">{t('home.pipeline')}</span>
+                                        <span className="block text-sm text-slate-500">{t('home.openQuotes', { count: d.pipeline.count })}</span>
+                                    </span>
+                                    <span className="text-lg font-extrabold tabular-nums text-slate-900">{money(d.pipeline.value)}</span>
+                                    <ChevronRight size={18} className="text-slate-300" />
+                                </button>
+                            )}
                         </div>
                     </div>
                 )}

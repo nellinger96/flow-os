@@ -157,12 +157,12 @@ export default function Clients() {
     const knownCities = useMemo(() => [...new Set(clients.map(c => c.city?.trim()).filter(Boolean))], [clients])
 
     return (
-        <div className="flex h-[calc(100vh-60px)] bg-slate-50 font-sans">
-            <aside className={`${selected ? 'hidden md:flex' : 'flex'} w-full shrink-0 flex-col border-r border-slate-200 bg-white md:w-80 lg:w-96`}>
+        <div className="app-viewport flex bg-slate-50 font-sans">
+            <aside className={`${selected ? 'hidden lg:flex' : 'flex'} w-full shrink-0 flex-col border-r border-slate-200 bg-white lg:w-80 xl:w-96`}>
                 <ClientList clients={clients} loading={loading} selectedId={selected?.id} onSelect={open} onCreate={createClient} />
             </aside>
 
-            <main className={`${selected ? 'flex' : 'hidden md:flex'} min-w-0 flex-1 flex-col`}>
+            <main className={`${selected ? 'flex' : 'hidden lg:flex'} min-w-0 flex-1 flex-col`}>
                 {selected ? (
                     <ClientEditor
                         key={selected.id}

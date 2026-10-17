@@ -1,6 +1,6 @@
 import { escapeHtml as esc, formatDate, formatDateTime, formatTime, formatTimeRange, money, toNumber, todayISO } from './format'
 import { menuSections } from './menu'
-import { CONTRACT_TERMS, CURRENT_TERMS_VERSION } from './contractTerms'
+import { termsFor } from './contractTerms'
 
 export function printHtml(html) {
     const iframe = document.createElement('iframe')
@@ -128,7 +128,7 @@ export function kitchenSheetHtml({ client, t, lng }) {
 // `contract` has the shape of customers.signed_contract (or the same shape
 // built from the live client record for contracts signed before snapshots).
 export function contractHtml({ contract, business, t, lng }) {
-    const terms = CONTRACT_TERMS[contract.terms_version || contract.version] || CONTRACT_TERMS[CURRENT_TERMS_VERSION]
+    const terms = termsFor(contract.terms_version || contract.version, lng)
     const sd = contract.service_data || {}
     const body = `
       ${header(business, t('doc.contract'), contract.signed_at ? [`${t('doc.signedOn')} ${formatDateTime(contract.signed_at, lng)}`] : [])}
@@ -145,7 +145,7 @@ export function contractHtml({ contract, business, t, lng }) {
         <div class="row total"><span>${esc(t('doc.total'))}</span><span>${esc(money(contract.job_price))}</span></div>
       </div>
       <div class="section box"><div class="label">${esc(t('doc.paymentSchedule'))}</div>${paymentRows(sd.payment_plan, t, lng)}</div>
-      <div class="section terms"><div class="label">Terms & Conditions</div>
+      <div class="section terms"><div class="label">${esc(t('sign.terms'))}</div>
         ${terms.map(([title, text], i) => `<p><strong>${i + 1}. ${esc(title)}:</strong> ${esc(text)}</p>`).join('')}
       </div>
       <div class="section sig"><div class="label">${esc(t('doc.signature'))}</div>

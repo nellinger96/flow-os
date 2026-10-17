@@ -222,7 +222,7 @@ export default function EventDay() {
     const btn = 'flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40'
 
     return (
-        <div className="min-h-[calc(100vh-60px)] bg-slate-50 font-sans">
+        <div className="bg-slate-50 font-sans">
             <div className={`mx-auto px-4 py-5 md:py-8 ${tab === 'schedule' && trucks.length > 1 ? 'max-w-6xl' : 'max-w-3xl'}`}>
                 {/* DAY PICKER */}
                 <div className="mb-4 flex items-center justify-between gap-2">
@@ -242,9 +242,9 @@ export default function EventDay() {
                 </div>
 
                 {/* ACTIONS */}
-                <div className="mb-4 grid grid-cols-3 gap-2">
-                    <button onClick={() => openShare(null)} disabled={!events.length || day < today || shareBusy} className="flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-40">
-                        {shareBusy ? <Loader2 size={16} className="animate-spin" /> : <Link2 size={16} />}{t('day.shareShort')}
+                <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <button onClick={() => openShare(null)} disabled={!events.length || day < today || shareBusy} className="col-span-2 flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-3 text-base font-bold text-white hover:bg-blue-700 disabled:opacity-40">
+                        {shareBusy ? <Loader2 size={18} className="animate-spin" /> : <Link2 size={18} />}{t('day.shareShort')}
                     </button>
                     <button onClick={print} disabled={!events.length} className={btn}><Printer size={16} />{t('loadout.print')}</button>
                     {tab === 'schedule'
@@ -278,7 +278,7 @@ export default function EventDay() {
 
                         {sheet.unassigned.length > 0 && (
                             <div className="rounded-2xl border border-amber-200 bg-white">
-                                <div className="px-4 pb-1 pt-3 text-xs font-bold uppercase tracking-wide text-amber-700">{t('day.unassigned', { count: sheet.unassigned.length })}</div>
+                                <div className="px-4 pb-1 pt-3 text-sm font-bold text-amber-700">{t('day.unassigned', { count: sheet.unassigned.length })}</div>
                                 {sheet.unassigned.map(client => (
                                     <div key={client.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-slate-100 px-4 py-3 first:border-0">
                                         <div className="min-w-0 flex-1">

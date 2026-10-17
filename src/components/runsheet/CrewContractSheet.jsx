@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { CalendarDays, Clock, ExternalLink, FileSignature, MapPin, Users } from 'lucide-react'
 import { formatDate, formatDateTime, formatTimeRange, toNumber } from '../../lib/format'
 import { menuSections } from '../../lib/menu'
-import { CONTRACT_TERMS, CURRENT_TERMS_VERSION } from '../../lib/contractTerms'
+import { termsFor } from '../../lib/contractTerms'
 import Sheet from '../clients/Sheet'
 
 // The contract as the crew sees it: what was agreed, without prices or payments.
@@ -13,7 +13,7 @@ export default function CrewContractSheet({ contract, onClose }) {
     const sd = contract.service_data || {}
     const guests = toNumber(sd.guest_count)
     const place = [contract.address, contract.city].filter(Boolean).join(', ')
-    const terms = CONTRACT_TERMS[contract.terms_version] || CONTRACT_TERMS[CURRENT_TERMS_VERSION]
+    const terms = termsFor(contract.terms_version, lng)
     const sections = menuSections(sd)
 
     return (
@@ -43,7 +43,7 @@ export default function CrewContractSheet({ contract, onClose }) {
                 </div>
 
                 <div className="rounded-xl border border-slate-200 bg-white p-4">
-                    <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">{t('doc.menu')}</div>
+                    <div className="mb-2 text-sm font-bold text-slate-500">{t('doc.menu')}</div>
                     {sections.length === 0 ? <div className="text-sm text-slate-500">{t('doc.customMenu')}</div> : (
                         <div className="grid grid-cols-2 gap-3">
                             {sections.map((s, i) => (

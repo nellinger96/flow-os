@@ -1,234 +1,213 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../supabaseClient'
-import { Plus, Trash2, Save, ArrowLeft, Building, Utensils, Coffee, Salad, Beef, Edit2, X, Check, CreditCard, CheckCircle, ExternalLink, LogOut, CakeSlice, Package } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { Building2, Check, CheckCircle2, ChevronRight, CreditCard, ExternalLink, Loader2, Pencil, Plus, Trash2, Truck, UtensilsCrossed, X } from 'lucide-react'
+import { supabase } from '../supabaseClient'
+import { MENU_CATEGORIES } from '../lib/menu'
+import { inputClass, selectClass } from '../components/clients/styles'
 
-const MENU_SECTIONS = [
-    { key: 'Entree', singular: 'Entree', label: 'Entrees', color: '#be123c', Icon: Beef },
-    { key: 'Side', singular: 'Side', label: 'Sides', color: '#15803d', Icon: Salad },
-    { key: 'Drink', singular: 'Drink', label: 'Drinks', color: '#b45309', Icon: Coffee },
-    { key: 'Dessert', singular: 'Dessert', label: 'Desserts', color: '#db2777', Icon: CakeSlice },
-    { key: 'Supplies', singular: 'Supplies', label: 'Supplies (not counted as food)', color: '#475569', Icon: Package },
-]
+// --- STRIPE CONFIGURATION ---
+// NOTE: When you go live, you will change this Client ID to the Live one!
+const STRIPE_CLIENT_ID = 'ca_U6kYuZzJeEPABPOFJCuVBoMFafdBLFhN'
+const REDIRECT_URI = 'https://caterflowos.netlify.app/'
+const stripeConnectUrl = `https://connect.stripe.com/oauth/authorize?response_type=code&client_id=${STRIPE_CLIENT_ID}&scope=read_write&redirect_uri=${REDIRECT_URI}`
+
+function Section({ icon: Icon, title, hint, children }) {
+    return (
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 md:p-6">
+            <div className="mb-4 flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700"><Icon size={20} /></span>
+                <div>
+                    <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+                    {hint && <p className="text-sm text-slate-500">{hint}</p>}
+                </div>
+            </div>
+            {children}
+        </section>
+    )
+}
 
 export default function Settings() {
-    const [profile, setProfile] = useState({ business_name: '', city: '', state: '', stripe_account_id: null })
-    const [items, setItems] = useState([])
-    const [newItem, setNewItem] = useState({ name: '', category: 'Entree', description: '' }) 
-    const [editingId, setEditingId] = useState(null)
-    const [savingProfile, setSavingProfile] = useState(false)
+    const { t } = useTranslation()
     const navigate = useNavigate()
-
-    // --- STRIPE CONFIGURATION ---
-    // NOTE: When you go live, you will change this Client ID to the Live one!
-    const STRIPE_CLIENT_ID = 'ca_U6kYuZzJeEPABPOFJCuVBoMFafdBLFhN'
-    const REDIRECT_URI = 'https://caterflowos.netlify.app/'
-    const stripeConnectUrl = `https://connect.stripe.com/oauth/authorize?response_type=code&client_id=${STRIPE_CLIENT_ID}&scope=read_write&redirect_uri=${REDIRECT_URI}`
+    const [profile, setProfile] = useState({ business_name: '', city: '', state: '' })
+    const [stripeId, setStripeId] = useState(null)
+    const [savingProfile, setSavingProfile] = useState(false)
+    const [savedProfile, setSavedProfile] = useState(false)
+    const [items, setItems] = useState([])
+    const [newItem, setNewItem] = useState({ name: '', category: 'Entree' })
+    const [editing, setEditing] = useState(null) // { id, name }
 
     useEffect(() => {
+        let cancelled = false
         async function init() {
             const { data: { user } } = await supabase.auth.getUser()
-            
-            // 1. Get Basic Info
-            let currentProfile = {
-                business_name: user?.user_metadata?.business_name || '',
-                city: user?.user_metadata?.city || '',
-                state: user?.user_metadata?.state || '',
-                stripe_account_id: null
-            }
-
-            // 2. Get Stripe Status
-            if (user) {
-                const { data: dbProfile } = await supabase.from('profiles').select('stripe_account_id').eq('id', user.id).single()
-                if (dbProfile) {
-                    currentProfile.stripe_account_id = dbProfile.stripe_account_id
-                }
-            }
-            setProfile(currentProfile)
-
-            // 3. Get Menu Items
-            const { data } = await supabase.from('services').select('*').order('created_at', { ascending: true })
-            setItems(data?.filter(i => i.item_type !== 'rental') || [])
+            if (!user || cancelled) return
+            setProfile({
+                business_name: user.user_metadata?.business_name || '',
+                city: user.user_metadata?.city || '',
+                state: user.user_metadata?.state || '',
+            })
+            const [{ data: dbProfile }, { data: services }] = await Promise.all([
+                supabase.from('profiles').select('stripe_account_id').eq('id', user.id).single(),
+                supabase.from('services').select('*').order('created_at', { ascending: true }),
+            ])
+            if (cancelled) return
+            setStripeId(dbProfile?.stripe_account_id || null)
+            setItems((services || []).filter(i => i.item_type !== 'rental'))
         }
         init()
+        return () => { cancelled = true }
     }, [])
 
-    async function saveProfile() {
+    async function saveProfile(e) {
+        e.preventDefault()
         setSavingProfile(true)
-        const { error } = await supabase.auth.updateUser({ data: { business_name: profile.business_name, city: profile.city, state: profile.state } })
+        const { error } = await supabase.auth.updateUser({ data: { business_name: profile.business_name.trim(), city: profile.city.trim(), state: profile.state.trim() } })
         setSavingProfile(false)
-        if (error) alert("Error saving profile")
-        else alert("Profile updated!")
+        if (error) return alert(t('clients.saveFailed', { message: error.message }))
+        setSavedProfile(true)
+        setTimeout(() => setSavedProfile(false), 2500)
     }
 
     async function disconnectStripe() {
-        if (!confirm("Are you sure you want to disconnect? You won't be able to accept payments until you reconnect.")) return
-        try {
-            const { data: { user } } = await supabase.auth.getUser()
-            const { error } = await supabase.from('profiles').update({ stripe_account_id: null }).eq('id', user.id)
-            if (error) throw error
-            setProfile(prev => ({ ...prev, stripe_account_id: null }))
-            alert("Bank account disconnected.")
-        } catch (error) {
-            alert("Error disconnecting: " + error.message)
-        }
-    }
-
-    async function handleSaveItem() {
-        if (!newItem.name) return alert("Item Name required")
+        if (!window.confirm(t('settings.card.disconnectConfirm'))) return
         const { data: { user } } = await supabase.auth.getUser()
-        const payload = { name: newItem.name, description: newItem.description, category: newItem.category, item_type: 'catering', user_id: user.id }
-
-        if (editingId) {
-            await supabase.from('services').update(payload).eq('id', editingId)
-        } else {
-            await supabase.from('services').insert(payload)
-        }
-        resetForm()
-        const { data } = await supabase.from('services').select('*').order('created_at', { ascending: true })
-        setItems(data?.filter(i => i.item_type !== 'rental') || [])
+        const { error } = await supabase.from('profiles').update({ stripe_account_id: null }).eq('id', user.id)
+        if (error) return alert(t('clients.saveFailed', { message: error.message }))
+        setStripeId(null)
     }
 
-    function resetForm() {
-        setEditingId(null)
-        setNewItem({ name: '', category: 'Entree', description: '' })
+    async function addItem(e) {
+        e.preventDefault()
+        const name = newItem.name.trim()
+        if (!name) return
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data, error } = await supabase.from('services')
+            .insert({ name, category: newItem.category, item_type: 'catering', user_id: user.id, description: '' })
+            .select().single()
+        if (error) return alert(t('menu.addFailed', { message: error.message }))
+        setItems(prev => [...prev, data])
+        setNewItem(n => ({ ...n, name: '' }))
     }
 
-    function startEditing(item) {
-        setEditingId(item.id)
-        setNewItem({ name: item.name, category: item.category || 'Entree', description: item.description || '' })
-        // Scroll to input
-        document.getElementById('menu-input').scrollIntoView({ behavior: 'smooth' })
+    async function renameItem(e) {
+        e.preventDefault()
+        const name = editing.name.trim()
+        if (!name) return
+        const { error } = await supabase.from('services').update({ name }).eq('id', editing.id)
+        if (error) return alert(t('clients.saveFailed', { message: error.message }))
+        setItems(prev => prev.map(i => (i.id === editing.id ? { ...i, name } : i)))
+        setEditing(null)
     }
 
-    async function deleteItem(id) {
-        if (!confirm("Delete this item?")) return
-        await supabase.from('services').delete().eq('id', id)
-        setItems(items.filter(i => i.id !== id))
+    async function deleteItem(item) {
+        if (!window.confirm(t('settings.menu.deleteConfirm', { name: item.name }))) return
+        const { error } = await supabase.from('services').delete().eq('id', item.id)
+        if (error) return alert(t('clients.deleteFailed', { message: error.message }))
+        setItems(prev => prev.filter(i => i.id !== item.id))
     }
 
-    // Helper to group items by category
-    const getItemsByCategory = (cat) => items.filter(i => i.category === cat)
+    const label = 'mb-1 block text-sm font-semibold text-slate-700'
 
     return (
-        <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', fontFamily: 'sans-serif', paddingBottom:'80px' }}>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px' }}>
-                <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}><ArrowLeft size={24} /></button>
-                <h1 style={{ margin: 0, fontSize: '24px', color: '#1e293b' }}>Settings</h1>
-            </div>
+        <div className="mx-auto max-w-3xl space-y-4 px-4 py-5 md:py-8">
+            <h1 className="hidden text-3xl font-extrabold text-slate-900 md:block md:pb-2">{t('nav.settings')}</h1>
 
-            {/* STRIPE SETTINGS */}
-            <div style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '30px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
-                    <div style={{ background: '#eff6ff', padding: '10px', borderRadius: '50%' }}><CreditCard size={24} color="#2563EB" /></div>
-                    <div>
-                        <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>Payout Settings</h3>
-                        <p style={{ margin: '5px 0 0 0', color: '#64748b', fontSize: '14px' }}>Connect your bank to receive client payments.</p>
+            {/* BUSINESS */}
+            <Section icon={Building2} title={t('settings.business.title')} hint={t('settings.business.hint')}>
+                <form onSubmit={saveProfile} className="space-y-3">
+                    <label className="block">
+                        <span className={label}>{t('settings.business.name')}</span>
+                        <input value={profile.business_name} onChange={e => setProfile(p => ({ ...p, business_name: e.target.value }))} className={inputClass} />
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                        <label className="block">
+                            <span className={label}>{t('clients.city')}</span>
+                            <input value={profile.city} onChange={e => setProfile(p => ({ ...p, city: e.target.value }))} className={inputClass} />
+                        </label>
+                        <label className="block">
+                            <span className={label}>{t('settings.business.state')}</span>
+                            <input value={profile.state} onChange={e => setProfile(p => ({ ...p, state: e.target.value }))} className={inputClass} />
+                        </label>
                     </div>
-                </div>
-                <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
-                    {profile.stripe_account_id ? (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#166534', fontWeight: 'bold' }}>
-                                    <CheckCircle size={20} /><span>Bank Account Connected</span>
-                                </div>
-                                <button onClick={disconnectStripe} style={{ background: 'none', border: 'none', padding: 0, color: '#ef4444', fontSize: '12px', cursor: 'pointer', textAlign: 'left', textDecoration: 'underline', marginTop: '4px' }}>Disconnect / Reset</button>
-                            </div>
-                            <span style={{ fontSize: '12px', background: '#dcfce7', padding: '6px 12px', borderRadius: '20px', border: '1px solid #bbf7d0', color: '#15803d', fontWeight:'bold' }}>Active</span>
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                            <div style={{ fontSize: '14px', color: '#475569' }}>Connect Stripe to start charging clients immediately.</div>
-                            <a href={stripeConnectUrl} style={{ background: '#635bff', color: 'white', padding: '12px 20px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '10px', width: 'fit-content' }}>
-                                <CreditCard size={18} /> Setup Payouts <ExternalLink size={14}/>
-                            </a>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* BUSINESS PROFILE */}
-            <div style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '30px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                    <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}><Building size={20} color="#3b82f6" /> Business Profile</h3>
-                    <button onClick={saveProfile} disabled={savingProfile} style={{ background: '#0f172a', color: 'white', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>{savingProfile ? 'Saving...' : 'Save'}</button>
-                </div>
-                <div className="profile-grid">
-                    <div><label className="lbl">Business Name</label><input value={profile.business_name} onChange={e => setProfile({...profile, business_name: e.target.value})} className="std-input" /></div>
-                    <div className="city-state-grid">
-                        <div><label className="lbl">City</label><input value={profile.city} onChange={e => setProfile({...profile, city: e.target.value})} className="std-input" /></div>
-                        <div><label className="lbl">State</label><input value={profile.state} onChange={e => setProfile({...profile, state: e.target.value})} className="std-input" /></div>
-                    </div>
-                </div>
-            </div>
-
-            {/* NEW MENU MANAGER */}
-            <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '25px' }}>
-                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
-                    <h3 style={{ margin: 0, display:'flex', alignItems:'center', gap:'10px' }}><Utensils size={20} color="#f59e0b"/> Menu Manager</h3>
-                    {editingId && <button onClick={resetForm} style={{background:'#fee2e2', color:'#dc2626', border:'none', padding:'6px 12px', borderRadius:'6px', cursor:'pointer', fontWeight:'bold', fontSize:'12px', display:'flex', gap:'5px', alignItems:'center'}}><X size={14}/> Cancel Edit</button>}
-                </div>
-
-                {/* Input Area */}
-                <div id="menu-input" className={`input-grid ${editingId ? 'editing' : ''}`}>
-                    <select value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} className="std-input">
-                        {MENU_SECTIONS.map(({ key, singular }) => <option key={key} value={key}>{singular}</option>)}
-                    </select>
-                    <input placeholder="New Item Name (e.g. Tacos)" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="std-input" />
-                    <button onClick={handleSaveItem} style={{ background: editingId ? '#ea580c' : '#2563EB', color: 'white', border: 'none', height: '42px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {editingId ? <Check size={20} /> : <Plus size={20} />}
+                    <button type="submit" disabled={savingProfile} className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white hover:bg-blue-700 disabled:opacity-60">
+                        {savingProfile ? <Loader2 size={18} className="animate-spin" /> : savedProfile ? <Check size={18} /> : null}
+                        {savedProfile ? t('common.saved') : t('common.save')}
                     </button>
-                </div>
+                </form>
+            </Section>
 
-                {/* VISUAL MENU DISPLAY */}
-                <div style={{ display: 'grid', gap: '20px', marginTop: '30px' }}>
-                    
-                    {MENU_SECTIONS.map(({ key, label, color, Icon }) => (
-                        <div key={key} className="menu-section">
-                            <h4 style={{margin: '0 0 10px 0', color, display:'flex', alignItems:'center', gap:'8px'}}><Icon size={18}/> {label}</h4>
-                            <div className="tag-container">
-                                {getItemsByCategory(key).length === 0 && <span className="empty-msg">No {label.toLowerCase()} yet.</span>}
-                                {getItemsByCategory(key).map(item => (
-                                    <div key={item.id} className="menu-tag" onClick={() => startEditing(item)}>
-                                        {item.name}
-                                        <button onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} className="del-btn"><X size={12}/></button>
+            {/* CARD PAYMENTS */}
+            <Section icon={CreditCard} title={t('settings.card.title')} hint={t('settings.card.hint')}>
+                {stripeId ? (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-green-50 p-4">
+                        <span className="flex items-center gap-2 font-bold text-green-800"><CheckCircle2 size={20} />{t('settings.card.connected')}</span>
+                        <button onClick={disconnectStripe} className="text-sm font-semibold text-red-600 underline">{t('settings.card.disconnect')}</button>
+                    </div>
+                ) : (
+                    <a href={stripeConnectUrl} className="inline-flex items-center gap-2 rounded-xl bg-[#635bff] px-5 py-3 font-bold text-white hover:opacity-90">
+                        <CreditCard size={18} />{t('settings.card.connect')}<ExternalLink size={14} />
+                    </a>
+                )}
+            </Section>
+
+            {/* MENU */}
+            <Section icon={UtensilsCrossed} title={t('settings.menu.title')} hint={t('settings.menu.hint')}>
+                <form onSubmit={addItem} className="mb-5 flex flex-col gap-2 rounded-xl bg-slate-50 p-3 sm:flex-row">
+                    <select value={newItem.category} onChange={e => setNewItem(n => ({ ...n, category: e.target.value }))} className={`${selectClass} sm:w-40`}>
+                        {MENU_CATEGORIES.map(c => <option key={c.key} value={c.key}>{t(`menu.categorySingular.${c.key}`)}</option>)}
+                    </select>
+                    <input value={newItem.name} onChange={e => setNewItem(n => ({ ...n, name: e.target.value }))} placeholder={t('settings.menu.placeholder')} className={`${inputClass} flex-1`} />
+                    <button type="submit" className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 font-bold text-white hover:bg-blue-700"><Plus size={18} />{t('common.add')}</button>
+                </form>
+                <div className="space-y-5">
+                    {MENU_CATEGORIES.map(cat => {
+                        const list = items.filter(i => (i.category || 'Entree') === cat.key)
+                        return (
+                            <div key={cat.key}>
+                                <div className="mb-2 text-base font-bold text-slate-800">{t(`menu.category.${cat.key}`)} <span className="font-normal text-slate-400">({list.length})</span></div>
+                                {list.length === 0 ? <div className="text-sm text-slate-400">{t('menu.noItems')}</div> : (
+                                    <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
+                                        {list.map(item => (
+                                            editing?.id === item.id ? (
+                                                <form key={item.id} onSubmit={renameItem} className="flex gap-2 p-2">
+                                                    <input autoFocus value={editing.name} onChange={e => setEditing(ed => ({ ...ed, name: e.target.value }))} className={`${inputClass} flex-1`} />
+                                                    <button type="submit" className="rounded-lg bg-blue-600 px-3 text-white" aria-label={t('common.save')}><Check size={18} /></button>
+                                                    <button type="button" onClick={() => setEditing(null)} className="rounded-lg px-2 text-slate-500" aria-label={t('common.cancel')}><X size={18} /></button>
+                                                </form>
+                                            ) : (
+                                                <div key={item.id} className="flex items-center gap-2 px-3 py-2.5">
+                                                    <span className="min-w-0 flex-1 truncate text-slate-800">{item.name}</span>
+                                                    <button onClick={() => setEditing({ id: item.id, name: item.name })} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label={t('summary.editInfo')}><Pencil size={16} /></button>
+                                                    <button onClick={() => deleteItem(item)} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label={t('common.delete')}><Trash2 size={16} /></button>
+                                                </div>
+                                            )
+                                        ))}
                                     </div>
-                                ))}
+                                )}
                             </div>
-                        </div>
-                    ))}
-
+                        )
+                    })}
                 </div>
+            </Section>
+
+            {/* EVENT DAY */}
+            <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                {[
+                    [UtensilsCrossed, t('loadout.equipment'), t('settings.links.equipment'), '/loadout/equipment'],
+                    [Truck, t('day.settings.title'), t('settings.links.trucks'), '/day'],
+                ].map(([Icon, title, hint, to]) => (
+                    <button key={to} onClick={() => navigate(to)} className="flex w-full items-center gap-3 px-4 py-4 text-left hover:bg-slate-50 md:px-6">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700"><Icon size={20} /></span>
+                        <span className="min-w-0 flex-1">
+                            <span className="block text-base font-bold text-slate-900">{title}</span>
+                            <span className="block text-sm text-slate-500">{hint}</span>
+                        </span>
+                        <ChevronRight size={18} className="text-slate-300" />
+                    </button>
+                ))}
             </div>
-
-            <style>{`
-                .std-input { padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; width: 100%; box-sizing: border-box; }
-                .lbl { display: block; font-size: 13px; font-weight: bold; color: #475569; margin-bottom: 5px; }
-                .profile-grid { display: grid; gap: 15px; }
-                .city-state-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-                .input-grid { display: grid; grid-template-columns: 1fr 2fr 60px; gap: 10px; align-items: center; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px dashed #cbd5e1; }
-                .input-grid.editing { background: #fff7ed; border: 1px solid #fdba74; }
-                
-                /* NEW STYLES FOR MENU TAGS */
-                .menu-section { background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #f1f5f9; }
-                .tag-container { display: flex; flex-wrap: wrap; gap: 8px; }
-                .menu-tag { 
-                    background: white; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 20px; 
-                    font-size: 14px; color: #334155; cursor: pointer; display: flex; alignItems: center; gap: 8px;
-                    transition: all 0.1s;
-                }
-                .menu-tag:hover { border-color: #3b82f6; color: #3b82f6; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-                .del-btn { background: #fef2f2; border: none; color: #ef4444; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-                .del-btn:hover { background: #fee2e2; }
-                .empty-msg { font-size: 13px; color: #94a3b8; font-style: italic; }
-
-                @media (max-width: 768px) {
-                    .input-grid { grid-template-columns: 1fr; gap: 15px; }
-                    .city-state-grid { grid-template-columns: 1fr; }
-                }
-            `}</style>
         </div>
     )
 }

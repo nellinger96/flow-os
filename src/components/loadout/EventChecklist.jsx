@@ -68,9 +68,9 @@ export default function EventChecklist({ client, list, phase, actions, pending, 
                         </div>
                     </div>
                     <div className="flex shrink-0 gap-1.5">
-                        {onContract && <button onClick={onContract} className="rounded-lg bg-blue-50 p-2 text-blue-700" aria-label={t('crew.contract')}><FileText size={18} /></button>}
-                        {place && <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place)}`} target="_blank" rel="noreferrer" className="rounded-lg bg-blue-50 p-2 text-blue-700" aria-label={t('summary.map')}><MapPin size={18} /></a>}
-                        {phone && <a href={`tel:${phone}`} className="rounded-lg bg-blue-50 p-2 text-blue-700" aria-label={t('summary.call')}><Phone size={18} /></a>}
+                        {onContract && <button onClick={onContract} className="rounded-xl bg-blue-50 p-2.5 text-blue-700" aria-label={t('crew.contract')}><FileText size={18} /></button>}
+                        {place && <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place)}`} target="_blank" rel="noreferrer" className="rounded-xl bg-blue-50 p-2.5 text-blue-700" aria-label={t('summary.map')}><MapPin size={18} /></a>}
+                        {phone && <a href={`tel:${phone}`} className="rounded-xl bg-blue-50 p-2.5 text-blue-700" aria-label={t('summary.call')}><Phone size={18} /></a>}
                     </div>
                 </div>
 
@@ -111,7 +111,7 @@ export default function EventChecklist({ client, list, phase, actions, pending, 
                 <div className="mt-2">
                     {groups.map(g => (
                         <div key={g.cat}>
-                            <div className="bg-slate-50 px-4 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">{t(`loadout.category.${g.cat}`)}</div>
+                            <div className="bg-slate-50 px-4 py-1 text-sm font-semibold text-slate-500">{t(`loadout.category.${g.cat}`)}</div>
                             {g.items.map(item => {
                                 const isDone = Boolean(item[doneKey])
                                 const busy = pending?.has(`${client.id}:${item.key}`)

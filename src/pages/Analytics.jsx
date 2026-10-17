@@ -1,32 +1,78 @@
 import { useEffect, useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+import Segmented from '../components/loadout/Segmented'
+import { MENU_CATEGORIES, selectedMenu } from '../lib/menu'
 import { supabase } from '../supabaseClient'
-import { UtensilsCrossed, MapPin, Calendar, DollarSign, Wallet, Users, Target } from 'lucide-react'
+import { UtensilsCrossed, MapPin, Calendar, Loader2 } from 'lucide-react'
 import { ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid, AreaChart, Area } from 'recharts'
 
+function TrendTooltip({ active, payload, label }) {
+    const { t } = useTranslation()
+    if (!active || !payload?.length) return null
+    const row = payload[0].payload
+    return (
+        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-lg">
+            <div className="font-bold text-slate-900">{label}</div>
+            <div className="font-bold text-slate-900">${row.Revenue.toLocaleString()}</div>
+            <div className="text-slate-500">{t('calendar.eventsCount', { count: row.Events })}</div>
+        </div>
+    )
+}
+
+const formatAxisMoney = (v) => v >= 1000 ? `$${(v / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}k` : `$${v}`
+
+function RankedList({ rows, total, emptyText }) {
+    const { t } = useTranslation()
+    if (!rows.length) return <div className="py-3 text-sm text-slate-400">{emptyText}</div>
+    const max = rows[0].value
+    return (
+        <ol className="space-y-4">
+            {rows.map((row, i) => {
+                const share = total > 0 ? Math.round((row.value / total) * 100) : 0
+                return (
+                    <li key={row.name}>
+                        <div className="mb-1.5 flex items-baseline gap-3">
+                            <span className="w-5 text-sm font-bold tabular-nums text-slate-400">{i + 1}</span>
+                            <span className="min-w-0 flex-1 break-words text-base font-semibold leading-snug text-slate-900">{row.name}</span>
+                            <span className="shrink-0 whitespace-nowrap text-sm text-slate-500">{t('reports.share', { percent: share })}</span>
+                        </div>
+                        <div className="ml-8 h-2 overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-full rounded-full bg-blue-600" style={{ width: `${(row.value / max) * 100}%`, opacity: i === 0 ? 1 : 0.55 }} />
+                        </div>
+                    </li>
+                )
+            })}
+        </ol>
+    )
+}
+
+const FOOD_CATEGORIES = MENU_CATEGORIES.filter(c => c.food)
+
 export default function Analytics() {
+    const { t, i18n } = useTranslation()
+    const locale = i18n.language === 'es' ? 'es-MX' : 'en-US'
     const [loading, setLoading] = useState(true)
     const [rawCustomers, setRawCustomers] = useState([])
-    const [timeframe, setTimeframe] = useState('all')
+    const [menuLibrary, setMenuLibrary] = useState([])
+    const [timeframe, setTimeframe] = useState('year')
 
     useEffect(() => {
-        fetchData()
-    }, [])
-
-    async function fetchData() {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-
-        const { data: customers } = await supabase
-            .from('customers')
-            .select('*')
-            .eq('user_id', user.id)
-            .not('job_price', 'is', null) 
-        
-        if (customers) {
-            setRawCustomers(customers)
+        let cancelled = false
+        async function load() {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) { setLoading(false); return }
+            const [{ data: customers }, { data: services }] = await Promise.all([
+                supabase.from('customers').select('*').eq('user_id', user.id).not('job_price', 'is', null),
+                supabase.from('services').select('name, category').neq('item_type', 'rental'),
+            ])
+            if (cancelled) return
+            if (customers) setRawCustomers(customers)
+            setMenuLibrary(services || [])
+            setLoading(false)
         }
-        setLoading(false)
-    }
+        load()
+        return () => { cancelled = true }
+    }, [])
 
     // Helper function to force clean city names
     function cleanCityName(raw) {
@@ -62,7 +108,8 @@ export default function Analytics() {
         let soldCount = 0
         let totalGuests = 0
         const cityMap = {}
-        const itemMap = {}
+        // Dish counts per menu category (Entree, Side, Drink, Dessert)
+        const itemMaps = Object.fromEntries(FOOD_CATEGORIES.map(c => [c.key, {}]))
         const monthMap = {}
 
         const sortedCustomers = [...filteredCustomers].sort((a, b) => {
@@ -103,24 +150,16 @@ export default function Analytics() {
                 }
             }
 
-            // MENU ITEMS
+            // MENU ITEMS: each dish counted once per event, under its category
             if (isSold) {
-                const allItems = [
-                    ...(c.service_data?.menu_entrees || []),
-                    ...(c.service_data?.menu_sides || []),
-                    ...(c.service_data?.menu_drinks || []),
-                    ...(c.service_data?.selected_menu_items || [])
-                ]
-                
-                const eventItems = new Set()
-                allItems.forEach(item => {
-                    if (item && typeof item === 'string' && item.trim()) {
-                        // Title case the menu items for uniformity
-                        eventItems.add(item.trim().charAt(0).toUpperCase() + item.trim().slice(1).toLowerCase())
-                    }
+                selectedMenu(c.service_data, menuLibrary).groups.filter(g => g.food).forEach(group => {
+                    group.items.forEach(item => {
+                        if (typeof item !== 'string' || !item.trim()) return
+                        const name = item.trim().charAt(0).toUpperCase() + item.trim().slice(1).toLowerCase()
+                        const map = itemMaps[group.key]
+                        map[name] = (map[name] || 0) + 1
+                    })
                 })
-                // Count each item once per event
-                eventItems.forEach(name => { itemMap[name] = (itemMap[name] || 0) + 1 })
             }
 
             // TRENDS (bucketed by day in month view, by month otherwise)
@@ -163,8 +202,8 @@ export default function Analytics() {
         }
         const monthlyTrends = buckets.map(d => ({
             name: timeframe === 'month'
-                ? d.toLocaleString('default', { month: 'short', day: 'numeric' })
-                : d.toLocaleString('default', { month: 'short', year: '2-digit' }),
+                ? d.toLocaleString(locale, { month: 'short', day: 'numeric' })
+                : d.toLocaleString(locale, { month: 'short', year: '2-digit' }),
             Events: monthMap[bucketKey(d)]?.Events || 0,
             Revenue: monthMap[bucketKey(d)]?.Revenue || 0,
         }))
@@ -174,10 +213,13 @@ export default function Analytics() {
             .sort((a, b) => b.value - a.value)
             .slice(0, 8)
 
-        const topItems = Object.entries(itemMap)
-            .map(([name, value]) => ({ name, value }))
-            .sort((a, b) => b.value - a.value)
-            .slice(0, 8)
+        const topItems = FOOD_CATEGORIES.map(cat => ({
+            key: cat.key,
+            rows: Object.entries(itemMaps[cat.key])
+                .map(([name, value]) => ({ name, value }))
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 5),
+        }))
 
         return {
             bookedRevenue: bookedRev,
@@ -190,135 +232,52 @@ export default function Analytics() {
             topItems, 
             monthlyTrends
         }
-    }, [rawCustomers, timeframe])
-
-    const TrendTooltip = ({ active, payload, label }) => {
-        if (!active || !payload?.length) return null
-        const row = payload[0].payload
-        return (
-            <div style={{ background: 'white', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 12px rgba(15,23,42,0.08)', fontSize: '13px' }}>
-                <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>{label}</div>
-                <div style={{ color: '#0f172a', fontWeight: 700 }}>${row.Revenue.toLocaleString()}</div>
-                <div style={{ color: '#64748b' }}>{row.Events} booked {row.Events === 1 ? 'event' : 'events'}</div>
-            </div>
-        )
-    }
-
-    const formatAxisMoney = (v) => v >= 1000 ? `$${(v / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}k` : `$${v}`
-
-    const RankedList = ({ rows, total, unit, emptyText }) => {
-        if (!rows.length) return <div style={{ padding: '40px 0', textAlign: 'center', color: '#94a3b8' }}>{emptyText}</div>
-        const max = rows[0].value
-        return (
-            <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {rows.map((row, i) => {
-                    const share = total > 0 ? Math.round((row.value / total) * 100) : 0
-                    return (
-                        <li key={row.name} title={`${row.name}: ${row.value} ${unit} (${share}% of booked events)`}>
-                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '6px' }}>
-                                <span style={{ width: '18px', fontSize: '12px', fontWeight: 700, color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>{i + 1}</span>
-                                <span style={{ flex: 1, minWidth: 0, fontSize: '14px', fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name}</span>
-                                <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>{row.value}</span>
-                                <span style={{ width: '40px', textAlign: 'right', fontSize: '12px', color: '#64748b', fontVariantNumeric: 'tabular-nums' }}>{share}%</span>
-                            </div>
-                            <div style={{ marginLeft: '28px', height: '6px', borderRadius: '3px', background: '#f1f5f9', overflow: 'hidden' }}>
-                                <div style={{ width: `${(row.value / max) * 100}%`, height: '100%', borderRadius: '3px', background: '#2563EB', opacity: i === 0 ? 1 : 0.55 }} />
-                            </div>
-                        </li>
-                    )
-                })}
-            </ol>
-        )
-    }
-
-    const cardStyle = { background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }
-    const cardTitleStyle = { margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', fontSize: '17px' }
-    const cardSubStyle = { margin: '4px 0 0 30px', fontSize: '13px', color: '#64748b' }
+    }, [rawCustomers, menuLibrary, timeframe, locale])
 
     if (loading) return (
-        <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
-            <div className="spin" style={{ marginRight: '10px', width: '24px', height: '24px', border: '3px solid #e2e8f0', borderTopColor: '#2563EB', borderRadius: '50%' }}></div>
-            Aggregating Dashboards...
+        <div className="flex h-[60vh] items-center justify-center gap-2 text-slate-400">
+            <Loader2 size={20} className="animate-spin" />{t('common.loading')}
         </div>
     )
 
-    if (!metrics) return <div style={{padding:'40px', textAlign:'center', color:'#64748b'}}>No data available yet. Add some clients to see analytics.</div>
+    if (!metrics) return <div className="p-10 text-center text-slate-500">{t('reports.noData')}</div>
+
+    const tiles = [
+        [t('reports.booked'), `$${metrics.bookedRevenue.toLocaleString()}`, 'text-green-700'],
+        [t('reports.average'), `$${metrics.avgOrderValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, 'text-slate-900'],
+        [t('reports.avgGuests'), String(metrics.avgGuests), 'text-slate-900'],
+        [t('reports.winRate'), `${metrics.conversionRate}%`, 'text-slate-900'],
+    ]
 
     return (
-        <div style={{ padding: 'clamp(16px, 4vw, 30px)', maxWidth: '1200px', margin: '0 auto', fontFamily: 'sans-serif', background: '#f8fafc', minHeight: '100vh' }}>
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '20px', marginBottom: '30px' }}>
-                <div>
-                    <h1 style={{ margin: '0 0 5px 0', color: '#0f172a', fontSize: '28px', fontWeight: '900' }}>Overview Dashboard</h1>
-                    <p style={{ margin: 0, color: '#64748b' }}>Real-time insights based on your booked events.</p>
-                </div>
-                
-                <div style={{ background: 'white', padding: '5px', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', gap: '5px' }}>
-                    <button onClick={() => setTimeframe('all')} style={{ padding: '8px 16px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', background: timeframe === 'all' ? '#0f172a' : 'transparent', color: timeframe === 'all' ? 'white' : '#64748b', transition: 'all 0.2s' }}>All Time</button>
-                    <button onClick={() => setTimeframe('year')} style={{ padding: '8px 16px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', background: timeframe === 'year' ? '#0f172a' : 'transparent', color: timeframe === 'year' ? 'white' : '#64748b', transition: 'all 0.2s' }}>This Year (YTD)</button>
-                    <button onClick={() => setTimeframe('month')} style={{ padding: '8px 16px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', background: timeframe === 'month' ? '#0f172a' : 'transparent', color: timeframe === 'month' ? 'white' : '#64748b', transition: 'all 0.2s' }}>This Month</button>
-                </div>
+        <div className="mx-auto max-w-5xl px-4 py-5 md:py-8">
+            <h1 className="mb-1 hidden text-3xl font-extrabold text-slate-900 md:block">{t('nav.reports')}</h1>
+            <p className="mb-4 text-slate-500">{t('reports.intro')}</p>
+
+            <div className="mb-5 max-w-md">
+                <Segmented value={timeframe} onChange={setTimeframe} options={[['month', t('reports.thisMonth')], ['year', t('reports.thisYear')], ['all', t('reports.allTime')]]} />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '30px' }}>
-                <div style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                            <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Booked Revenue</div>
-                            <div style={{ fontSize: '28px', fontWeight: '900', color: '#16a34a' }}>${metrics.bookedRevenue.toLocaleString()}</div>
-                        </div>
-                        <div style={{ background: '#dcfce7', padding: '10px', borderRadius: '12px', color: '#16a34a' }}><DollarSign size={20} /></div>
+            <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+                {tiles.map(([label, value, color]) => (
+                    <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="text-sm font-semibold text-slate-500">{label}</div>
+                        <div className={`mt-1 text-2xl font-extrabold tabular-nums ${color}`}>{value}</div>
                     </div>
-                </div>
-
-                <div style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                            <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Avg Order Value</div>
-                            <div style={{ fontSize: '28px', fontWeight: '900', color: '#2563EB' }}>${metrics.avgOrderValue.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
-                        </div>
-                        <div style={{ background: '#dbeafe', padding: '10px', borderRadius: '12px', color: '#2563EB' }}><Wallet size={20} /></div>
-                    </div>
-                </div>
-
-                <div style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                            <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Avg Event Size</div>
-                            <div style={{ fontSize: '28px', fontWeight: '900', color: '#8b5cf6' }}>{metrics.avgGuests} <span style={{fontSize:'16px', color:'#94a3b8'}}>Guests</span></div>
-                        </div>
-                        <div style={{ background: '#f3e8ff', padding: '10px', borderRadius: '12px', color: '#9333ea' }}><Users size={20} /></div>
-                    </div>
-                </div>
-
-                <div style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                            <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Win Rate (Sold)</div>
-                            <div style={{ fontSize: '28px', fontWeight: '900', color: '#f59e0b' }}>{metrics.conversionRate}%</div>
-                        </div>
-                        <div style={{ background: '#fef3c7', padding: '10px', borderRadius: '12px', color: '#d97706' }}><Target size={20} /></div>
-                    </div>
-                </div>
+                ))}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: '20px' }}>
-
-                {/* 1. REVENUE TREND */}
-                <div style={{ ...cardStyle, gridColumn: '1 / -1' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <section className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5 lg:col-span-2">
+                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                         <div>
-                            <h3 style={cardTitleStyle}><Calendar size={20} color="#64748b" /> Booked Revenue</h3>
-                            <p style={cardSubStyle}>{timeframe === 'month' ? 'By day, this month' : 'By month'} · hover for details</p>
+                            <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900"><Calendar size={20} className="text-slate-400" />{t('reports.byMonth')}</h2>
+                            <p className="text-sm text-slate-500">{timeframe === 'month' ? t('reports.byDayHint') : t('reports.byMonthHint')}</p>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: '24px', fontWeight: 900, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>${metrics.bookedRevenue.toLocaleString()}</div>
-                            <div style={{ fontSize: '12px', color: '#64748b' }}>+ ${metrics.pipelineRevenue.toLocaleString()} in pipeline</div>
-                        </div>
+                        {metrics.pipelineRevenue > 0 && <div className="text-sm text-slate-500">{t('reports.notBookedYet', { amount: `$${metrics.pipelineRevenue.toLocaleString()}` })}</div>}
                     </div>
-
-                    <div style={{ width: '100%', height: '280px' }}>
-                        {metrics.monthlyTrends.length === 0 ? <div style={{height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8'}}>Not enough data</div> :
+                    <div className="h-64 w-full md:h-72">
+                        {metrics.monthlyTrends.length === 0 ? <div className="flex h-full items-center justify-center text-slate-400">{t('reports.notEnough')}</div> :
                             <ResponsiveContainer>
                                 <AreaChart data={metrics.monthlyTrends} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
                                     <defs>
@@ -328,39 +287,35 @@ export default function Analytics() {
                                         </linearGradient>
                                     </defs>
                                     <CartesianGrid vertical={false} stroke="#f1f5f9" />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={8} minTickGap={24} />
-                                    <YAxis tickFormatter={formatAxisMoney} axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} width={52} />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 13 }} dy={8} minTickGap={24} />
+                                    <YAxis tickFormatter={formatAxisMoney} axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 13 }} width={56} />
                                     <RechartsTooltip content={<TrendTooltip />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1 }} />
                                     <Area type="monotone" dataKey="Revenue" stroke="#16a34a" strokeWidth={2} fill="url(#colorRev)" dot={false} activeDot={{ r: 5, fill: '#16a34a', stroke: 'white', strokeWidth: 2 }} />
                                 </AreaChart>
                             </ResponsiveContainer>
                         }
                     </div>
-                </div>
+                </section>
 
-                {/* 2. TOP MENU ITEMS */}
-                <div style={cardStyle}>
-                    <div style={{ marginBottom: '20px' }}>
-                        <h3 style={cardTitleStyle}><UtensilsCrossed size={20} color="#64748b" /> Top Menu Items</h3>
-                        <p style={cardSubStyle}>% of booked events that included it</p>
+                <section className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5 lg:col-span-2">
+                    <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900"><UtensilsCrossed size={20} className="text-slate-400" />{t('reports.topDishes')}</h2>
+                    <p className="mb-4 text-sm text-slate-500">{t('reports.topDishesHint')}</p>
+                    <div className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
+                        {metrics.topItems.map(cat => (
+                            <div key={cat.key}>
+                                <h3 className="mb-3 border-b border-slate-100 pb-2 text-base font-bold text-slate-800">{t(`menu.category.${cat.key}`)}</h3>
+                                <RankedList rows={cat.rows} total={metrics.soldCount} emptyText={t('reports.noDishesIn')} />
+                            </div>
+                        ))}
                     </div>
-                    <RankedList rows={metrics.topItems} total={metrics.soldCount} unit="events" emptyText="No menu items tracked yet" />
-                </div>
+                </section>
 
-                {/* 3. TOP LOCATIONS */}
-                <div style={cardStyle}>
-                    <div style={{ marginBottom: '20px' }}>
-                        <h3 style={cardTitleStyle}><MapPin size={20} color="#64748b" /> Event Hotspots</h3>
-                        <p style={cardSubStyle}>Booked events by city</p>
-                    </div>
-                    <RankedList rows={metrics.topCities} total={metrics.soldCount} unit="events" emptyText="No locations tracked yet" />
-                </div>
-
+                <section className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
+                    <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900"><MapPin size={20} className="text-slate-400" />{t('reports.topCities')}</h2>
+                    <p className="mb-4 text-sm text-slate-500">{t('reports.topCitiesHint')}</p>
+                    <RankedList rows={metrics.topCities} total={metrics.soldCount} emptyText={t('reports.noCities')} />
+                </section>
             </div>
-            <style>{`
-                @keyframes spin { 100% { transform: rotate(360deg); } }
-                .spin { animation: spin 1s linear infinite; }
-            `}</style>
         </div>
     )
 }

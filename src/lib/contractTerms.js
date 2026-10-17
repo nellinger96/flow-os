@@ -13,3 +13,23 @@ export const CONTRACT_TERMS = {
 }
 
 export const CURRENT_TERMS_VERSION = 1
+
+// Spanish translation of each version, shown when the reader picks Español.
+// Same terms, same numbering; keep in step with CONTRACT_TERMS.
+export const CONTRACT_TERMS_ES = {
+    1: [
+        ['Anticipo y pagos', 'Se requiere un anticipo no reembolsable para apartar la fecha. El pago total se hace según el plan de pagos de arriba. Los pagos atrasados pueden causar la cancelación del servicio.'],
+        ['Cancelaciones', 'Las cancelaciones hechas con menos de 30 días antes del evento tienen un cargo del 50%. Las cancelaciones con menos de 7 días de anticipación no son reembolsables.'],
+        ['Número de personas', 'El número final de personas se debe confirmar 7 días antes del evento. Ese número se usa para el cobro final y para preparar la comida.'],
+        ['Comida que sobra', 'La comida que sobre es responsabilidad del cliente. No somos responsables de la seguridad de la comida una vez entregada o dejada en el lugar.'],
+        ['Responsabilidad', 'No somos responsables por daños al lugar o a objetos personales, a menos que los cause directamente un descuido de nuestro personal.'],
+        ['Horario del servicio', 'El servicio se da durante el horario indicado. Las horas extra tienen un cargo adicional.'],
+    ],
+}
+
+// Terms of a version in the reader's language (English if there's no translation)
+export function termsFor(version, lng) {
+    const v = version || CURRENT_TERMS_VERSION
+    if (lng === 'es' && CONTRACT_TERMS_ES[v]) return CONTRACT_TERMS_ES[v]
+    return CONTRACT_TERMS[v] || CONTRACT_TERMS[CURRENT_TERMS_VERSION]
+}

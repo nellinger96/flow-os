@@ -16,7 +16,7 @@ function MinutesField({ label, value, placeholder, onSave }) {
     }
     return (
         <label className="block">
-            <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</span>
+            <span className="mb-1 block text-sm font-semibold text-slate-500">{label}</span>
             <span className="flex items-center gap-1">
                 <input type="number" min="0" inputMode="numeric" value={draft} placeholder={String(placeholder)} onChange={e => setDraft(e.target.value)} onBlur={commit}
                     onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()}
@@ -81,9 +81,9 @@ function Stop({ stop, index, settings, now, owner, trucks, actions, onOpenClient
                             </div>
                         </div>
                         <div className="flex shrink-0 gap-1.5">
-                            {onContract && <button onClick={() => onContract(client)} className="rounded-lg bg-blue-50 p-2 text-blue-700" aria-label={t('crew.contract')}><FileText size={18} /></button>}
-                            {place && <a href={mapsLeg(null, place)} target="_blank" rel="noreferrer" className="rounded-lg bg-blue-50 p-2 text-blue-700" aria-label={t('summary.map')}><Navigation size={18} /></a>}
-                            {phone && <a href={`tel:${phone}`} className="rounded-lg bg-blue-50 p-2 text-blue-700" aria-label={t('summary.call')}><Phone size={18} /></a>}
+                            {onContract && <button onClick={() => onContract(client)} className="rounded-xl bg-blue-50 p-2.5 text-blue-700" aria-label={t('crew.contract')}><FileText size={18} /></button>}
+                            {place && <a href={mapsLeg(null, place)} target="_blank" rel="noreferrer" className="rounded-xl bg-blue-50 p-2.5 text-blue-700" aria-label={t('summary.map')}><Navigation size={18} /></a>}
+                            {phone && <a href={`tel:${phone}`} className="rounded-xl bg-blue-50 p-2.5 text-blue-700" aria-label={t('summary.call')}><Phone size={18} /></a>}
                         </div>
                     </div>
 
@@ -92,15 +92,15 @@ function Stop({ stop, index, settings, now, owner, trucks, actions, onOpenClient
                     ) : (
                         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                             <div className={`rounded-xl px-1 py-2 ${state.key === 'shouldHaveLeft' ? 'bg-red-50' : 'bg-slate-50'}`}>
-                                <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t('day.leaveBy')}</div>
+                                <div className="text-sm font-semibold text-slate-500">{t('day.leaveBy')}</div>
                                 <div className={`text-lg font-extrabold tabular-nums ${state.key === 'shouldHaveLeft' ? 'text-red-700' : 'text-slate-900'}`}>{fmt(stop.leaveBy)}</div>
                             </div>
                             <div className="rounded-xl bg-slate-50 px-1 py-2">
-                                <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t('day.arriveBy')}</div>
+                                <div className="text-sm font-semibold text-slate-500">{t('day.arriveBy')}</div>
                                 <div className="text-lg font-extrabold tabular-nums text-slate-900">{fmt(stop.arriveBy)}</div>
                             </div>
                             <div className="rounded-xl bg-slate-900 px-1 py-2 text-white">
-                                <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{t('day.service')}</div>
+                                <div className="text-sm font-semibold text-slate-400">{t('day.service')}</div>
                                 <div className="text-lg font-extrabold tabular-nums">{fmt(stop.service)}</div>
                                 <div className="text-[11px] text-slate-300">{t(stop.endEstimated ? 'day.untilEstimated' : 'day.until', { time: fmt(stop.serviceEnd) })}</div>
                             </div>

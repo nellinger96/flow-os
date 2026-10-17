@@ -65,6 +65,9 @@ export function dialable(phone) {
     return m ? m[0].replace(/[^\d+]/g, '') : ''
 }
 
+// "octubre de 2026" -> "Octubre de 2026"
+export const upperFirst = (text) => (text ? text.charAt(0).toUpperCase() + text.slice(1) : text)
+
 // "15:00", "19:30" -> "3:00 PM – 7:30 PM" (just the start when there's no end)
 export function formatTimeRange(start, end, lng) {
     const a = formatTime(start, lng)

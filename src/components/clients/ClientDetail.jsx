@@ -143,10 +143,10 @@ export default function ClientDetail({
                 <div className="mx-auto max-w-2xl px-4 pb-10 pt-3 md:px-6 md:pt-6">
                     {/* TOP BAR */}
                     <div className="mb-2 flex items-center justify-between">
-                        <button onClick={onBack} className="-ml-2 flex items-center gap-1 rounded-lg p-2 text-sm font-semibold text-slate-600 active:bg-slate-100 md:hidden">
+                        <button onClick={onBack} className="-ml-2 flex items-center gap-1 rounded-lg p-2 text-sm font-semibold text-slate-600 active:bg-slate-100 lg:hidden">
                             <ArrowLeft size={20} /> {t('nav.directory')}
                         </button>
-                        <span className="hidden md:block" />
+                        <span className="hidden lg:block" />
                         <div className="flex items-center gap-1">
                             <button onClick={() => setSheet('info')} className="flex items-center gap-1.5 rounded-lg p-2 text-sm font-semibold text-blue-600 active:bg-blue-50 md:hover:bg-blue-50">
                                 <Pencil size={16} /> {t('summary.editInfo')}
@@ -182,7 +182,7 @@ export default function ClientDetail({
                     {/* NAME + STATUS */}
                     <div className="flex items-start justify-between gap-3">
                         <h1 className="min-w-0 break-words text-2xl font-extrabold leading-tight text-slate-900">{client.full_name || '—'}</h1>
-                        <label className={`relative mt-0.5 flex shrink-0 items-center gap-1 rounded-full py-1 pl-3 pr-2 text-xs font-bold uppercase tracking-wide ${STATUS_STYLE[status]}`}>
+                        <label className={`relative mt-0.5 flex shrink-0 items-center gap-1 rounded-full py-1.5 pl-3.5 pr-2.5 text-sm font-bold ${STATUS_STYLE[status]}`}>
                             {statusSaving ? <Loader2 size={12} className="animate-spin" /> : null}
                             {t(`status.${status}`)}
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m6 9 6 6 6-6" /></svg>
@@ -216,7 +216,7 @@ export default function ClientDetail({
                     <button onClick={() => setSheet('payments')} className="mt-4 block w-full rounded-2xl bg-slate-900 p-4 text-left text-white active:bg-slate-800">
                         <div className="flex items-end justify-between">
                             <div>
-                                <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t('payments.booked')}</div>
+                                <div className="text-sm font-semibold text-slate-400">{t('payments.booked')}</div>
                                 <div className="text-3xl font-extrabold">{money(total)}</div>
                             </div>
                             <div className="text-right text-sm">
