@@ -237,3 +237,51 @@ export function runSheetHtml({ day, sheet, t, lng }) {
     const empty = `<div class="muted">${esc(t('day.nothingAssigned'))}</div>`
     return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(t('day.tabSchedule'))}</title><style>${BASE_CSS}${css}</style></head><body>${body || empty}</body></html>`
 }
+
+// Cancellation confirmation for the client: the original event and contract,
+// when and why it was canceled, and how the money was settled.
+export function cancellationHtml({ client, business, t, lng }) {
+    const sd = client.service_data || {}
+    const c = sd.cancellation || {}
+    const long = (iso) => formatDate(iso, lng, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+    const signedBy = client.signed_contract?.signed_by || sd.signed_by
+    const signedAt = client.signed_contract?.signed_at || sd.signed_at
+    const contractLine = client.contract_url === 'SIGNED_DIGITALLY'
+        ? t('cancel.docSigned', { name: signedBy || client.full_name, date: signedAt ? formatDate(signedAt, lng) : '' })
+        : client.contract_url ? t('contract.paperOnFile') : t('cancel.docNoContract')
+    const refund = toNumber(c.refund)
+    const owes = toNumber(c.owes)
+    const resultRow = refund > 0
+        ? `<div class="row total"><span>${esc(t('cancel.docRefund'))}</span><span>${esc(money(refund))}</span></div>`
+        : owes > 0
+            ? `<div class="row total"><span>${esc(t('cancel.docOwes'))}</span><span>${esc(money(owes))}</span></div>`
+            : `<div class="row total"><span>${esc(t('cancel.nothingDue'))}</span><span>${esc(money(0))}</span></div>`
+    const body = `
+      ${header(business, t('cancel.docTitle'), [`${t('doc.issued')}: ${formatDate(todayISO(), lng)}`])}
+      <div class="section" style="font-size:16px">${esc(t('cancel.docStatement', { name: client.full_name || '', event: long(sd.event_date) || t('common.tbd'), date: long(c.canceled_on) }))}</div>
+      <div class="grid">
+        <div class="box"><div class="label">${esc(t('doc.client'))}</div>
+          <div style="font-size:18px;font-weight:bold">${esc(client.full_name)}</div>
+          ${[client.address, client.city].filter(Boolean).map(v => `<div class="muted">${esc(v)}</div>`).join('')}
+          <div class="muted" style="margin-top:8px">${esc(contractLine)}</div>
+        </div>
+        ${eventBox(client, t, lng)}
+      </div>
+      <div class="section box"><div class="label">${esc(t('cancel.docDetails'))}</div>
+        <div class="row"><span>${esc(t('cancel.date'))}</span><strong>${esc(long(c.canceled_on))}</strong></div>
+        <div class="row"><span>${esc(t('cancel.whoAsked'))}</span><strong>${esc(t(`cancel.by.${c.requested_by || 'client'}`))}</strong></div>
+        ${c.reason ? `<div class="row"><span>${esc(t('cancel.reason'))}</span><strong>${esc(c.reason)}</strong></div>` : ''}
+      </div>
+      <div class="section box"><div class="label">${esc(t('cancel.money'))}</div>
+        <div class="row"><span>${esc(t('cancel.total'))}</span><span>${esc(money(c.total))}</span></div>
+        <div class="row"><span>${esc(t('cancel.paid'))}</span><span>${esc(money(c.paid))}</span></div>
+        <div class="row"><span>${esc(t('cancel.fee'))}</span><span>${esc(money(c.fee))}</span></div>
+        ${resultRow}
+      </div>
+      <div class="section muted">${esc(t('cancel.docNote'))}</div>
+      <div class="grid" style="margin-top:50px">
+        <div><div style="border-top:1px solid #0f172a;padding-top:6px">${esc(business?.business_name || '')}</div><div class="muted">${esc(t('cancel.docSignDate'))}</div></div>
+        <div><div style="border-top:1px solid #0f172a;padding-top:6px">${esc(client.full_name || '')}</div><div class="muted">${esc(t('cancel.docSignDate'))}</div></div>
+      </div>`
+    return page(`${t('cancel.docTitle')} – ${client.full_name || ''}`, body)
+}

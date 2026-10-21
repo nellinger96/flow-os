@@ -167,6 +167,7 @@ export default function CalendarPage() {
 
         clients.forEach(c => {
             const sd = c.service_data || {}
+            if (c.status === 'canceled') return
             const status = PIPELINE.includes(c.status) ? c.status : 'lead'
             const date = isoDate(sd.event_date)
 

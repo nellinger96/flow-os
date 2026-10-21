@@ -122,13 +122,14 @@ export default function Analytics() {
             const price = parseFloat(c.job_price) || 0
             const guests = parseInt(c.service_data?.guest_count) || 0
             const isSold = c.status === 'sold'
+            const isCanceled = c.status === 'canceled'
 
             // REVENUE & KPIs
             if (isSold) {
                 bookedRev += price
                 soldCount += 1
                 totalGuests += guests
-            } else {
+            } else if (!isCanceled) {
                 pipelineRev += price
             }
 

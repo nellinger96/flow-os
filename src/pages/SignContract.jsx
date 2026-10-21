@@ -92,6 +92,19 @@ export default function SignContract() {
     const paymentPlan = sd.payment_plan || []
     const terms = termsFor(CURRENT_TERMS_VERSION, lng)
 
+    // --- EVENT CANCELED ---
+    if (client.status === 'canceled') {
+        return (
+            <div className="min-h-screen bg-slate-50 px-4 py-12 font-sans">
+                <div className="mx-auto max-w-lg rounded-3xl border border-slate-200 bg-white p-8 text-center">
+                    <h1 className="mb-2 text-2xl font-extrabold text-slate-900">{t('sign.canceledTitle')}</h1>
+                    <p className="text-lg text-slate-600">{t('sign.canceledBody', { name: client.full_name, date: formatDate(sd.event_date, lng, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) || t('common.tbd') })}</p>
+                    <div className="mt-6 flex justify-center"><div className="rounded-xl bg-slate-900 p-1"><LanguageSwitch /></div></div>
+                </div>
+            </div>
+        )
+    }
+
     // --- ALREADY SIGNED ---
     if (signed) {
         return (

@@ -48,7 +48,8 @@
     "lead": "Nuevo",
     "tasting": "Degustación",
     "proposal": "Cotización",
-    "sold": "Confirmado"
+    "sold": "Confirmado",
+    "canceled": "Cancelado"
   },
   "clients": {
     "search": "Buscar clientes…",
@@ -78,7 +79,8 @@
     "pleaseLogIn": "Inicia sesión.",
     "discardChanges": "Tienes cambios sin guardar. ¿Descartarlos?",
     "saveChanges": "Guardar cambios",
-    "contactInfo": "Datos de contacto"
+    "contactInfo": "Datos de contacto",
+    "filterCanceled": "Cancelados"
   },
   "tabs": {
     "event": "Evento",
@@ -602,7 +604,8 @@
       "Overdue": "Atrasado",
       "Partial": "Pagó una parte",
       "Unpaid": "Sin pagar",
-      "Paid": "Pagado completo"
+      "Paid": "Pagado completo",
+      "Canceled": "Cancelado"
     },
     "nextDue": "Próximo pago: {{amount}} el {{date}}",
     "wasDue": "Tenía que pagar {{amount}} el {{date}}",
@@ -613,7 +616,10 @@
       "late": "Nadie está atrasado. ¡Qué bien!",
       "paid": "Todavía no hay eventos pagados completos.",
       "all": "Todavía no hay eventos confirmados."
-    }
+    },
+    "refundDue": "Cancelado · devolver {{amount}}",
+    "cancelFeeDue": "Cancelado · todavía debe un cargo de {{amount}}",
+    "toRefund": "Por devolver"
   },
   "reports": {
     "intro": "Cómo va tu negocio, según tus eventos confirmados.",
@@ -688,6 +694,68 @@
     "notFound": "No encontramos este contrato. Revisa que abriste el link tal como te lo mandaron.",
     "doneTitle": "¡Listo!",
     "doneBody": "Gracias, {{name}}. Tu evento está confirmado.",
-    "signature": "Firma"
+    "signature": "Firma",
+    "canceledTitle": "Este evento fue cancelado",
+    "canceledBody": "El evento de {{name}} del {{date}} fue cancelado. Si tienes dudas, comunícate con nosotros."
+  },
+  "cancel": {
+    "title": "Cancelar evento",
+    "titleDone": "Cancelación",
+    "menu": "Cancelar evento",
+    "saveFirst": "Primero guarda tus cambios.",
+    "confirm": "¿Cancelar el evento de {{name}}? Se quita de tu calendario y de las listas de tu personal.",
+    "reactivate": "Volver a activar este evento",
+    "reactivateConfirm": "¿Volver a activar este evento? Queda como estaba antes de cancelarlo.",
+    "canceledOn": "Cancelado el {{date}}",
+    "bannerHint": "Ver los detalles e imprimir la confirmación",
+    "by": {
+      "client": "El cliente pidió cancelar",
+      "business": "Nosotros cancelamos"
+    },
+    "money": "Dinero",
+    "total": "Total del contrato",
+    "paid": "Ya pagó",
+    "fee": "Cargo por cancelación",
+    "feeHint": "cámbialo si quieres cobrar menos",
+    "refundPending": "Todavía tengo que devolver {{amount}}",
+    "refundDone": "Ya devolví {{amount}}",
+    "feePending": "Todavía debe {{amount}}",
+    "feePaid": "Ya pagó el cargo de {{amount}}",
+    "settled": "No queda nada pendiente.",
+    "document": "Confirmación de cancelación",
+    "documentHint": "Imprímela o guárdala como PDF y mándasela a tu cliente.",
+    "printEs": "Imprimir en español",
+    "printEn": "Imprimir en inglés",
+    "date": "Fecha de cancelación",
+    "whoAsked": "¿Quién canceló?",
+    "reason": "Motivo",
+    "optional": "opcional",
+    "reasonPlaceholder": "ej. Emergencia familiar",
+    "rule": {
+      "deposit_one": "Falta {{count}} día. Tu contrato dice que el anticipo no se devuelve.",
+      "deposit_other": "Faltan {{count}} días. Tu contrato dice que el anticipo no se devuelve.",
+      "under30_one": "Falta {{count}} día (menos de 30). Tu contrato cobra el 50%.",
+      "under30_other": "Faltan {{count}} días (menos de 30). Tu contrato cobra el 50%.",
+      "under7_one": "Falta {{count}} día (menos de 7). Tu contrato dice que no se devuelve nada.",
+      "under7_other": "Faltan {{count}} días (menos de 7). Tu contrato dice que no se devuelve nada.",
+      "unsigned": "No hay contrato firmado, así que no se sugiere cargo.",
+      "unsigned_one": "No hay contrato firmado, así que no se sugiere cargo.",
+      "unsigned_other": "No hay contrato firmado, así que no se sugiere cargo."
+    },
+    "suggested": "Cargo sugerido: {{amount}}.",
+    "youRefund": "Le devuelves {{amount}} al cliente",
+    "theyOwe": "El cliente todavía debe {{amount}}",
+    "nothingDue": "No queda nada por pagar",
+    "button": "Cancelar el evento",
+    "afterHint": "Después puedes imprimir la confirmación de cancelación.",
+    "docTitle": "Cancelación",
+    "docStatement": "Por medio de la presente se confirma que el evento de {{name}} del {{event}} fue cancelado el {{date}}.",
+    "docSigned": "Contrato firmado por {{name}} el {{date}}",
+    "docNoContract": "Sin contrato firmado",
+    "docDetails": "Detalles de la cancelación",
+    "docRefund": "Reembolso al cliente",
+    "docOwes": "Saldo pendiente",
+    "docNote": "No se prestará ningún servicio para este evento.",
+    "docSignDate": "Firma y fecha"
   }
 }

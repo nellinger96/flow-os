@@ -48,7 +48,8 @@
     "lead": "New",
     "tasting": "Tasting",
     "proposal": "Quote",
-    "sold": "Booked"
+    "sold": "Booked",
+    "canceled": "Canceled"
   },
   "clients": {
     "search": "Search clients…",
@@ -78,7 +79,8 @@
     "pleaseLogIn": "Please log in.",
     "discardChanges": "You have unsaved changes. Discard them?",
     "saveChanges": "Save changes",
-    "contactInfo": "Contact info"
+    "contactInfo": "Contact info",
+    "filterCanceled": "Canceled"
   },
   "tabs": {
     "event": "Event",
@@ -602,7 +604,8 @@
       "Overdue": "Late",
       "Partial": "Partly paid",
       "Unpaid": "Not paid",
-      "Paid": "Paid in full"
+      "Paid": "Paid in full",
+      "Canceled": "Canceled"
     },
     "nextDue": "Next payment: {{amount}} on {{date}}",
     "wasDue": "{{amount}} was due {{date}}",
@@ -613,7 +616,10 @@
       "late": "Nobody is late. Nice!",
       "paid": "No events paid in full yet.",
       "all": "No booked events yet."
-    }
+    },
+    "refundDue": "Canceled · refund {{amount}}",
+    "cancelFeeDue": "Canceled · still owes a {{amount}} fee",
+    "toRefund": "To refund"
   },
   "reports": {
     "intro": "How your business is doing, from your booked events.",
@@ -688,6 +694,68 @@
     "notFound": "We couldn't find this contract. Make sure you opened the link exactly as it was sent to you.",
     "doneTitle": "All set!",
     "doneBody": "Thank you, {{name}}. Your event is confirmed.",
-    "signature": "Signature"
+    "signature": "Signature",
+    "canceledTitle": "This event was canceled",
+    "canceledBody": "The event for {{name}} on {{date}} was canceled. If you have any questions, please contact us."
+  },
+  "cancel": {
+    "title": "Cancel event",
+    "titleDone": "Cancellation",
+    "menu": "Cancel event",
+    "saveFirst": "Save your changes first.",
+    "confirm": "Cancel {{name}}'s event? It will be removed from your calendar and staff lists.",
+    "reactivate": "Reactivate this event",
+    "reactivateConfirm": "Reactivate this event? It goes back to how it was before the cancellation.",
+    "canceledOn": "Canceled on {{date}}",
+    "bannerHint": "See the details and print the confirmation",
+    "by": {
+      "client": "The client asked to cancel",
+      "business": "We canceled"
+    },
+    "money": "Money",
+    "total": "Contract total",
+    "paid": "Already paid",
+    "fee": "Cancellation fee",
+    "feeHint": "change it to charge less",
+    "refundPending": "I still need to refund {{amount}}",
+    "refundDone": "Refunded {{amount}}",
+    "feePending": "They still owe {{amount}}",
+    "feePaid": "They paid the {{amount}} fee",
+    "settled": "Nothing left to settle.",
+    "document": "Cancellation confirmation",
+    "documentHint": "Print it or save it as a PDF and send it to your client.",
+    "printEs": "Print in Spanish",
+    "printEn": "Print in English",
+    "date": "Cancellation date",
+    "whoAsked": "Who canceled",
+    "reason": "Reason",
+    "optional": "optional",
+    "reasonPlaceholder": "e.g. Family emergency",
+    "rule": {
+      "deposit_one": "The event is {{count}} day away. Your contract keeps the deposit.",
+      "deposit_other": "The event is {{count}} days away. Your contract keeps the deposit.",
+      "under30_one": "The event is {{count}} day away (less than 30). Your contract charges 50%.",
+      "under30_other": "The event is {{count}} days away (less than 30). Your contract charges 50%.",
+      "under7_one": "The event is {{count}} day away (less than 7). Your contract says nothing is refunded.",
+      "under7_other": "The event is {{count}} days away (less than 7). Your contract says nothing is refunded.",
+      "unsigned": "There's no signed contract, so no fee is suggested.",
+      "unsigned_one": "There's no signed contract, so no fee is suggested.",
+      "unsigned_other": "There's no signed contract, so no fee is suggested."
+    },
+    "suggested": "Suggested fee: {{amount}}.",
+    "youRefund": "You refund {{amount}} to the client",
+    "theyOwe": "The client still owes {{amount}}",
+    "nothingDue": "Nothing left to pay",
+    "button": "Cancel the event",
+    "afterHint": "Then you can print the cancellation confirmation.",
+    "docTitle": "Cancellation",
+    "docStatement": "This confirms that the event for {{name}} on {{event}} was canceled on {{date}}.",
+    "docSigned": "Contract signed by {{name}} on {{date}}",
+    "docNoContract": "No signed contract",
+    "docDetails": "Cancellation details",
+    "docRefund": "Refund to the client",
+    "docOwes": "Balance still due",
+    "docNote": "No services will be provided for this event.",
+    "docSignDate": "Signature and date"
   }
 }

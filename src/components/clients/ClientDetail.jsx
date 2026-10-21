@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
     AlertTriangle, ArrowLeft, CalendarDays, Check, ChevronRight, CreditCard, FileSignature, Loader2,
-    MapPin, MessageSquare, MoreHorizontal, NotebookPen, Pencil, Phone, Printer, ShoppingBag, Trash2, Truck, UtensilsCrossed,
+    Ban, MapPin, MessageSquare, MoreHorizontal, NotebookPen, Pencil, Phone, Printer, ShoppingBag, Trash2, Truck, UtensilsCrossed,
 } from 'lucide-react'
 import { dialable, formatDate, formatTimeRange, money, toNumber } from '../../lib/format'
 import { selectedMenu } from '../../lib/menu'
@@ -17,12 +17,15 @@ import PaymentsTab from './PaymentsTab'
 import ContractTab from './ContractTab'
 import NotesSheet from './NotesSheet'
 import SetupSheet from './SetupSheet'
+import CancelSheet from './CancelSheet'
+import { CANCELED } from '../../lib/cancellation'
 
 const STATUS_STYLE = {
     lead: 'bg-slate-100 text-slate-700',
     tasting: 'bg-amber-100 text-amber-800',
     proposal: 'bg-blue-100 text-blue-800',
     sold: 'bg-green-100 text-green-800',
+    canceled: 'bg-red-100 text-red-800',
 }
 
 function Row({ icon: Icon, title, subtitle, alert, onClick }) {
@@ -72,7 +75,8 @@ export default function ClientDetail({
     }, [menuOpen])
 
     const sd = client.service_data || {}
-    const status = PIPELINE.includes(client.status) ? client.status : 'lead'
+    const canceled = client.status === CANCELED
+    const status = canceled ? CANCELED : PIPELINE.includes(client.status) ? client.status : 'lead'
     const plan = sd.payment_plan || []
     const total = toNumber(client.job_price)
     const collected = plan.reduce((s, p) => (p.paid ? s + toNumber(p.amount) : s), 0)
@@ -120,6 +124,7 @@ export default function ClientDetail({
         contract: { title: t('tabs.contract'), body: <ContractTab client={client} savedClient={savedClient} dirty={dirty} onClientReplaced={onClientReplaced} business={business} /> },
         notes: { title: t('summary.notesKitchen'), body: <NotesSheet client={client} setClient={setClient} />, footer: saveFooter },
         setup: { title: t('loadout.setup.title'), body: <SetupSheet client={client} setClient={setClient} />, footer: saveFooter },
+        cancel: { title: t(canceled ? 'cancel.titleDone' : 'cancel.title'), body: <CancelSheet client={client} business={business} dirty={dirty} onQuickUpdate={onQuickUpdate} onDone={() => setSheet(null)} /> },
     }
     const active = sheet && sheets[sheet]
 
@@ -170,6 +175,9 @@ export default function ClientDetail({
                                                 <Icon size={16} /> {label}
                                             </button>
                                         ))}
+                                        <button onClick={() => { setMenuOpen(false); setSheet('cancel') }} className="flex w-full items-center gap-3 border-t border-slate-100 px-4 py-3 text-left text-sm text-red-600 active:bg-red-50 md:hover:bg-red-50">
+                                            <Ban size={16} /> {t(canceled ? 'cancel.titleDone' : 'cancel.menu')}
+                                        </button>
                                         <button onClick={() => { setMenuOpen(false); onDelete() }} className="flex w-full items-center gap-3 border-t border-slate-100 px-4 py-3 text-left text-sm text-red-600 active:bg-red-50 md:hover:bg-red-50">
                                             <Trash2 size={16} /> {t('clients.deleteClient')}
                                         </button>
@@ -182,23 +190,37 @@ export default function ClientDetail({
                     {/* NAME + STATUS */}
                     <div className="flex items-start justify-between gap-3">
                         <h1 className="min-w-0 break-words text-2xl font-extrabold leading-tight text-slate-900">{client.full_name || '—'}</h1>
-                        <label className={`relative mt-0.5 flex shrink-0 items-center gap-1 rounded-full py-1.5 pl-3.5 pr-2.5 text-sm font-bold ${STATUS_STYLE[status]}`}>
-                            {statusSaving ? <Loader2 size={12} className="animate-spin" /> : null}
-                            {t(`status.${status}`)}
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m6 9 6 6 6-6" /></svg>
-                            <select
-                                value={status}
-                                onChange={e => changeStatus(e.target.value)}
-                                disabled={statusSaving}
-                                className="absolute inset-0 cursor-pointer opacity-0"
-                                aria-label={t('summary.status')}
-                            >
-                                {PIPELINE.map(s => <option key={s} value={s}>{t(`status.${s}`)}</option>)}
-                            </select>
-                        </label>
+                        {canceled ? (
+                            <button onClick={() => setSheet('cancel')} className={`mt-0.5 shrink-0 rounded-full px-3.5 py-1.5 text-sm font-bold ${STATUS_STYLE.canceled}`}>{t('status.canceled')}</button>
+                        ) : (
+                            <label className={`relative mt-0.5 flex shrink-0 items-center gap-1 rounded-full py-1.5 pl-3.5 pr-2.5 text-sm font-bold ${STATUS_STYLE[status]}`}>
+                                {statusSaving ? <Loader2 size={12} className="animate-spin" /> : null}
+                                {t(`status.${status}`)}
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m6 9 6 6 6-6" /></svg>
+                                <select
+                                    value={status}
+                                    onChange={e => changeStatus(e.target.value)}
+                                    disabled={statusSaving}
+                                    className="absolute inset-0 cursor-pointer opacity-0"
+                                    aria-label={t('summary.status')}
+                                >
+                                    {PIPELINE.map(s => <option key={s} value={s}>{t(`status.${s}`)}</option>)}
+                                </select>
+                            </label>
+                        )}
                     </div>
                     <div className="mt-1 text-[15px] font-medium text-slate-700">{eventLine || t('summary.noDate')}</div>
                     {placeLine && <div className="text-sm text-slate-500">{placeLine}</div>}
+                    {canceled && (
+                        <button onClick={() => setSheet('cancel')} className="mt-3 flex w-full items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-left text-red-800">
+                            <Ban size={20} className="shrink-0" />
+                            <span className="min-w-0 flex-1">
+                                <span className="block font-bold">{t('cancel.canceledOn', { date: formatDate(sd.cancellation?.canceled_on, lng, { month: 'short', day: 'numeric', year: 'numeric' }) })}</span>
+                                <span className="block text-sm">{t('cancel.bannerHint')}</span>
+                            </span>
+                            <ChevronRight size={18} className="shrink-0" />
+                        </button>
+                    )}
                     {!client.city?.trim() && (
                         <button onClick={() => setSheet('info')} className="mt-1 text-xs font-semibold text-amber-600">
                             {t('clients.cityMissing')} ›

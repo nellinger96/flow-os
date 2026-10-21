@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { CalendarDays, ChevronRight, Loader2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { formatDate, money, todayISO } from '../lib/format'
+import { formatDate, money, toNumber, todayISO } from '../lib/format'
 import { paymentSummary } from '../lib/payments'
+import { cancellationPending } from '../lib/cancellation'
 import Segmented from '../components/loadout/Segmented'
 
 const PILL = {
@@ -12,6 +13,7 @@ const PILL = {
     Partial: 'bg-amber-100 text-amber-800',
     Unpaid: 'bg-slate-100 text-slate-700',
     Paid: 'bg-green-100 text-green-800',
+    Canceled: 'bg-red-100 text-red-800',
 }
 
 // Who owes money for booked events, and when
@@ -32,17 +34,23 @@ export default function Invoices() {
             const { data } = await supabase.from('customers')
                 .select('id, full_name, job_price, service_data, status')
                 .eq('user_id', user.id)
-                .eq('status', 'sold')
+                .in('status', ['sold', 'canceled'])
             if (cancelled) return
             const today = todayISO()
-            const list = (data || []).map(c => ({
-                id: c.id,
-                name: c.full_name || '—',
-                date: c.service_data?.event_date || c.service_data?.service_date || '',
-                ...paymentSummary(c, today),
-            }))
+            const list = (data || []).flatMap(c => {
+                const base = { id: c.id, name: c.full_name || '—', date: c.service_data?.event_date || c.service_data?.service_date || '' }
+                if (c.status !== 'canceled') return [{ ...base, ...paymentSummary(c, today) }]
+                // Canceled: only listed while a fee is still owed or a refund still has to go out
+                if (!cancellationPending(c)) return []
+                const x = c.service_data.cancellation
+                const owes = x.fee_paid ? 0 : toNumber(x.owes)
+                return [{
+                    ...base, status: 'Canceled', canceled: true, total: toNumber(x.total), paid: toNumber(x.paid),
+                    balance: owes, overdueAmount: 0, nextDue: null, refundDue: x.refund_done ? 0 : toNumber(x.refund),
+                }]
+            })
             // Late first, then whatever is due soonest, then paid-up jobs
-            const rank = { Overdue: 0, Partial: 1, Unpaid: 1, Paid: 2 }
+            const rank = { Overdue: 0, Partial: 1, Unpaid: 1, Canceled: 1, Paid: 2 }
             list.sort((a, b) => rank[a.status] - rank[b.status] || (a.nextDue?.date || '9999').localeCompare(b.nextDue?.date || '9999'))
             setRows(list)
             setLoading(false)
@@ -60,7 +68,7 @@ export default function Invoices() {
     }), [rows])
 
     const shown = rows.filter(r => (
-        tab === 'owing' ? r.balance > 0
+        tab === 'owing' ? r.balance > 0 || r.refundDue > 0
             : tab === 'late' ? r.overdueAmount > 0
                 : tab === 'paid' ? r.status === 'Paid'
                     : true
@@ -111,6 +119,11 @@ export default function Invoices() {
                                     <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${PILL[r.status]}`}>{t(`pay.status.${r.status}`)}</span>
                                     <span className="flex items-center gap-1"><CalendarDays size={14} />{formatDate(r.date, lng, { month: 'short', day: 'numeric', year: 'numeric' }) || t('common.tbd')}</span>
                                 </div>
+                                {r.canceled && (
+                                    <div className="mt-1 text-sm font-semibold text-red-700">
+                                        {r.refundDue > 0 ? t('pay.refundDue', { amount: money(r.refundDue) }) : t('pay.cancelFeeDue', { amount: money(r.balance) })}
+                                    </div>
+                                )}
                                 {r.nextDue && (
                                     <div className={`mt-1 text-sm font-semibold ${r.nextDue.late ? 'text-red-700' : 'text-slate-700'}`}>
                                         {r.nextDue.date
@@ -120,7 +133,12 @@ export default function Invoices() {
                                 )}
                             </div>
                             <div className="shrink-0 text-right">
-                                {r.balance > 0 ? (
+                                {r.refundDue > 0 ? (
+                                    <>
+                                        <div className="text-xs text-slate-500">{t('pay.toRefund')}</div>
+                                        <div className="text-lg font-extrabold tabular-nums text-blue-700">{money(r.refundDue)}</div>
+                                    </>
+                                ) : r.balance > 0 ? (
                                     <>
                                         <div className="text-xs text-slate-500">{t('payments.balance')}</div>
                                         <div className={`text-lg font-extrabold tabular-nums ${r.overdueAmount > 0 ? 'text-red-700' : 'text-slate-900'}`}>{money(r.balance)}</div>

@@ -9,6 +9,7 @@ const FILTERS = [
     { key: 'upcoming', label: 'clients.filterUpcoming' },
     { key: 'lead', label: 'clients.filterLeads' },
     { key: 'sold', label: 'clients.filterBooked' },
+    { key: 'canceled', label: 'clients.filterCanceled' },
 ]
 
 function startOfToday() {
@@ -29,12 +30,14 @@ export default function ClientList({ clients, loading, selectedId, onSelect, onC
 
         if (filter === 'upcoming') {
             list = list
-                .filter(c => { const d = parseLocalDate(c.service_data?.event_date); return d && d >= today })
+                .filter(c => { const d = parseLocalDate(c.service_data?.event_date); return c.status !== 'canceled' && d && d >= today })
                 .sort((a, b) => parseLocalDate(a.service_data.event_date) - parseLocalDate(b.service_data.event_date))
         } else if (filter === 'lead') {
             list = list.filter(c => ['lead', 'tasting', 'proposal'].includes(c.status || 'lead'))
         } else if (filter === 'sold') {
             list = list.filter(c => c.status === 'sold')
+        } else if (filter === 'canceled') {
+            list = list.filter(c => c.status === 'canceled')
         }
         return list
     }, [clients, query, filter])

@@ -156,7 +156,7 @@ export default function Dashboard() {
         const weekEnd = addDays(weekStart, 6)
         const monthPrefix = today.slice(0, 7)
 
-        const rows = clients.map(c => ({
+        const rows = clients.filter(c => c.status !== 'canceled').map(c => ({
             client: c,
             status: OPEN_STAGES.includes(c.status) || c.status === 'sold' ? c.status : 'lead',
             date: isoDay(c.service_data?.event_date),
